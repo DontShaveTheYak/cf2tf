@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Setup CICD pipeline to build and publish content of Hugo based website from
+  AWS CodeCommit repo to s3 bucket.
+Resources:
+  ArtifactBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: Private
+      LifecycleConfiguration:
+        Rules:
+          - NoncurrentVersionExpirationInDays: 30
+            Status: Enabled
+      VersioningConfiguration:
+        Status: Enabled
+  CodeCommitRepo:
+    Type: AWS::CodeCommit::Repository "code commit repository"
+    Properties:
+      RepositoryDescription: Repository to host content of the Hugo website
+      RepositoryName: !Ref RepoName
+  WebHostingBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: PublicRead
+      BucketName: !Ref HostingBucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  WebHostingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebHostingBucket
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  - !Ref WebHostingBucket
+                  - "/*"
+            Principal: "*"
+  IAMRoleStack:
+    Type: 'AWS::CloudFormation::Stack'
+    DependsOn:
+      - ArtifactBucket
+    Properties:
+      TemplateURL: !Sub >-
+        https://${S3BucketName}.s3.amazonaws.com/${S3KeyPrefix}templates/iam.template.yaml
+      Parameters:
+        WebsiteBucket: !Ref WebHostingBucket
+        ArtifactBucket: !Ref ArtifactBucket
+  CodePipelineStack:
+    Type: 'AWS::CloudFormation::Stack'
+    DependsOn:
+      - WebHostingBucket
+    Properties:
+      TemplateURL: !Sub >-
+        https://${S3BucketName}.s3.amazonaws.com/${S3KeyPrefix}templates/pipeline.template.yaml
+      Parameters:
+        ArtifactBucket: !Ref ArtifactBucket
+        CodePipelineRoleArn: !GetAtt
+          - IAMRoleStack
+          - Outputs.CodePipelineRoleArn
+        CodeBuildRoleArn: !GetAtt
+          - IAMRoleStack
+          - Outputs.CodeBuildRoleArn
+        CloudfrontDistId: '!Ref CloudfrontDistId'
+        CloudfrontRole: '!Ref CloudfrontRoleArn'
+        WebsiteBucket: !Ref WebHostingBucket
+        RepoName: !Ref RepoName
+        RepoBranch: 'master'
+
+Parameters:
+  RepoName:
+    Description: Enter the repository name to host hugo website content
+    Type: String
+    MinLength: 1
+  HostingBucketName:
+    Description: Name of the S3 bucket to hold the website content (must be globally unique)
+    Type: String
+    MinLength: 3
+  S3BucketName:
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    ConstraintDescription: >-
+      Bucket name can include numbers, lowercase letters, uppercase
+      letters, and hyphens (-). It cannot start or end with a hyphen (-).
+    Default: aws-quickstart
+    Description: >-
+      S3 bucket name for the Quick Start assets. Quick Start bucket name can
+      include numbers, lowercase letters, uppercase letters, and hyphens (-). It
+      cannot start or end with a hyphen (-).
+    Type: String
+  S3KeyPrefix:
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    ConstraintDescription: >-
+      Quick Start key prefix can include numbers, lowercase letters, uppercase
+      letters, hyphens (-), and forward slash (/).
+    Default: quickstart-examples/samples/hugo-pipeline/
+    Description: >-
+      S3 key prefix for the Quick Start assets. Quick Start key prefix can
+      include numbers, lowercase letters, uppercase letters, hyphens (-), and
+      forward slash (/).
+    Type: String
+
+Outputs:
+  CodeCommitRepository:
+    Description: AWS CodeCommit repository
+    Value: !Ref CodeCommitRepo
+  WebsiteURL:
+    Value: !GetAtt [WebHostingBucket, WebsiteURL]
+    Description: URL for website hosted on S3
+  S3BucketSecureURL:
+    Value: !Join ['', ['https://', !GetAtt [WebHostingBucket, DomainName]]]
+    Description: Name of S3 bucket to hold website content
+  CodePipelineURL:
+    Description: The URL of the created Pipeline
+    Value: !Sub
+      - >-
+        https://${AWS::Region}.console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${CodePipelineName}
+      - CodePipelineName: !GetAtt
+          - CodePipelineStack
+          - Outputs.CodePipelineName
