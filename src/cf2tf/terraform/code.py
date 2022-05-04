@@ -9,8 +9,10 @@ from typing import Dict, Any, List, Tuple
 from thefuzz import process, fuzz
 
 import click
+import re
 
 from cf2tf.terraform import doc_file
+from cf2tf import cloudformation
 
 # from yaml import parse
 
@@ -120,7 +122,7 @@ class CloneProgress(RemoteProgress):
 class Var:
     def __init__(self, name: str, values: Dict[str, Any]) -> None:
         # print(values)
-        self.name = name
+        self.name = pascal_to_snake(name)
         self.description = values.get("Description", "")
         self.default = values.get("Default", "")
         self.type = values.get("Type", "").lower()
@@ -145,22 +147,44 @@ class Var:
         return code_block + "\n}\n"
 
 
+def pascal_to_snake(name: str):
+    name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
+
+
 class Resource:
     def __init__(
         self,
-        name: str,
-        type: str,
-        attributes: Dict[str, Any],
+        cf_resource: cloudformation.Resource,
+        docs_path: Path,
         all_attributes: List[str],
     ) -> None:
-        self.name = name
-        self.type = type
-        self.attributes = attributes
+        self.name = pascal_to_snake(cf_resource.logical_id)
+        self.cf_resource = cf_resource
+        self.docs_path = docs_path
+        self.type = docs_path.name.split(".")[0]
         self.all_attributes = all_attributes
+        self.attributes = {}
+
+    def convert(self):
+        # Convert cloudformation properties to terraform arguments
+
+        self.attributes = self.convert_attributes(
+            self.cf_resource.properties, self.all_attributes
+        )
+
+    def resolve(self):
+        # Convert cloudformation properties to terraform arguments
+
+        pass
 
     def write(self):
 
-        code_block = f'resource "aws_{self.type}" "{self.name}" {{'
+        code_block = f'resource "aws_{self.type}" "{self.name}" {{\n'
+
+        code_block += (
+            f"  // Converted from {self.cf_resource.logical_id} {self.cf_resource.type}"
+        )
 
         for name, value in self.attributes.items():
 
@@ -170,6 +194,61 @@ class Resource:
             code_block = code_block + f"\n  {name} = {use_quotes(value)}"
 
         return code_block + "\n}\n"
+
+    def convert_attributes(
+        self, cf_props: Dict[str, Any], valid_tf_attributes: List[str]
+    ):
+        """Converts cloudformation propeties into terraform attributes."""
+
+        # Search works better if we split the words apart, but we have to put it back together later
+        search_items = [item.replace("_", " ") for item in valid_tf_attributes]
+
+        converted_attrs: Dict[str, Any] = {}
+
+        for prop_name, prop_value in cf_props.items():
+
+            search_term = camel_case_split(prop_name)
+
+            log.debug(f"Searching for {search_term} instead of {prop_name}")
+
+            result = matcher(search_term, search_items, 50)
+
+            if not result:
+                converted_attrs[f"// CF Property - {prop_name}"] = prop_value
+                continue
+
+            attribute_match, ranking = result
+
+            # Putting the underscore back in
+            tf_attribute_name = attribute_match.replace(" ", "_")
+
+            log.debug(
+                f"Converted {prop_name} to {tf_attribute_name} with {ranking}% match."
+            )
+
+            # Terraform sometimes has nested blocks, if prop_value is a map, its possible
+            # that tf_attribute_name is a nested block in terraform
+
+            if isinstance(prop_value, dict):
+                section_name = self.find_section(tf_attribute_name)
+
+                if not section_name:
+                    converted_attrs[tf_attribute_name] = prop_value
+                    continue
+
+                valid_sub_attributes = doc_file.read_section(
+                    self.docs_path, section_name
+                )
+
+                log.debug(f"Valid Terraform attributes are {valid_sub_attributes}")
+
+                sub_attrs = self.convert_attributes(prop_value, valid_sub_attributes)
+                converted_attrs[tf_attribute_name] = sub_attrs
+                continue
+
+            converted_attrs[tf_attribute_name] = prop_value
+
+        return converted_attrs
 
     def create_subsection(
         self, name: str, values: Dict[str, Any], indent_level: int = 1
@@ -183,6 +262,35 @@ class Resource:
             code_block = code_block + f"\n{indent}  {name} = {use_quotes(value)}"
 
         return code_block + f"\n{indent}}}\n"
+
+    def find_section(self, tf_attribute_name: str):
+        """Checks to see if the attribute is also a subsection in the terraform documentation
+
+        Args:
+            tf_attribute_name (str): A terraform attribute name.
+
+        Returns:
+            str: The name of the section if found, otherwise none.
+        """
+
+        log.debug(f"Checking if {tf_attribute_name} has a section in {self.docs_path}.")
+
+        # Search works better if we split the words apart, but we have to put it back together later
+        search_term = tf_attribute_name.replace("_", " ")
+
+        search_items = doc_file.all_sections(self.docs_path)
+
+        result = matcher(search_term, search_items, 90)
+
+        if not result:
+            log.warn(f"{tf_attribute_name} does not have a section in {self.docs_path}")
+            return ""
+
+        result_name, ranking = result
+
+        log.debug(f"Found section {result_name} with {ranking}% match.")
+
+        return result_name
 
     # def convert_attr(self, cf_attributes: Dict[str, Any]):
 
@@ -251,10 +359,30 @@ class Resource:
         return tf_attribute_name
 
 
+class Data:
+    def __init__(self, name: str, type: str, attributes: Dict[str, Any]) -> None:
+        self.name = name
+        self.type = type
+        self.attributes = attributes
+
+    def write(self):
+
+        code_block = f'data "aws_{self.type}" "{self.name}" {{\n'
+
+        for name, value in self.attributes.items():
+
+            if isinstance(value, dict):
+                code_block = code_block + "\n\n" + self.create_subsection(name, value)
+                continue
+            code_block = code_block + f"\n  {name} = {use_quotes(value)}"
+
+        return code_block + "\n}\n"
+
+
 class Output:
     def __init__(self, name: str, attributes: Dict[str, Any]) -> None:
         # print(values)
-        self.name = name
+        self.name = pascal_to_snake(name)
 
         self.description = attributes.get("Description", "")
         self.attributes = attributes
@@ -298,3 +426,23 @@ def use_quotes(item: str):
         return item
 
     return f'"{item}"'
+
+
+def matcher(search_term: str, search_items: List[str], score_cutoff=0):
+
+    result: Optional[Tuple[str, int]] = process.extractOne(
+        # search_term, search_items, scorer=fuzz.token_sort_ratio
+        search_term,
+        search_items,
+        score_cutoff=score_cutoff
+        # scorer=fuzz.token_sort_ratio,
+    )
+
+    return result
+
+
+def camel_case_split(str) -> str:
+
+    items = re.findall(r"[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))", str)
+
+    return " ".join(items)

@@ -6,7 +6,7 @@ import yaml
 import logging
 import json
 
-from cf2tf.conversion import expressions as functions
+# from cf2tf.conversion import expressions as functions
 
 # from . import functions
 

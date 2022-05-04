@@ -14,6 +14,49 @@ log = logging.getLogger("cf2tf")
 # on to convert_resources
 
 
+def parse_template(cf_template: CFDict, search_manager: SearchManager):
+
+    vars = parse_vars(cf_template["Parameters"])
+
+    resources = parse_resources(cf_template["Resources"], search_manager)
+
+    outputs = parse_outputs(cf_template["Outputs"])
+
+    return vars + resources + outputs
+
+
+def parse_vars(cf_params: CFDict):
+
+    return [Var(var_name, values) for var_name, values in cf_params.items()]
+
+
+def parse_resources(cf_resources: CFDict, search_manager: SearchManager):
+
+    resources = get_cf_resources(cf_resources)
+
+    return [get_tf_resource(resource, search_manager) for resource in resources]
+
+
+def get_cf_resources(cf_resources: CFDict):
+    return [
+        cf.Resource(logical_id, fields) for logical_id, fields in cf_resources.items()
+    ]
+
+
+def get_tf_resource(cf_resource: cf.Resource, search_manager: SearchManager):
+
+    docs_path = search_manager.find(cf_resource.type)
+
+    all_tf_attrs = doc_file.parse_attributes(docs_path)
+
+    return tf.Resource(cf_resource, docs_path, all_tf_attrs)
+
+
+def parse_outputs(cf_outputs: CFDict):
+
+    return [Output(output_name, values) for output_name, values in cf_outputs.items()]
+
+
 class TerraformConverter:
     def __init__(self, cf_template: CFDict, search_manager: SearchManager) -> None:
         self.cf_template = cf_template
@@ -58,19 +101,19 @@ class TerraformConverter:
             # We need to handle instrinsic functions before we get here, but for now...
             # dirty hack
 
-            for prop_name, prop_value in fields.get("Properties", {}).items():
+            # for prop_name, prop_value in fields.get("Properties", {}).items():
 
-                if isinstance(prop_value, dict):
+            # if isinstance(prop_value, dict):
 
-                    # Get a key from the dict
-                    value_key: str = next(iter(prop_value))
+            #     # Get a key from the dict
+            #     value_key: str = next(iter(prop_value))
 
-                    if "Fn::" in value_key or "Ref" in value_key:
-                        log.error(
-                            f"Found instrinsic function {value_key} in {logical_id}'s Properties!"
-                        )
-                        log.debug(f"Converting {prop_value} to {prop_value[value_key]}")
-                        fields["Properties"][prop_name] = prop_value[value_key]
+            #     if "Fn::" in value_key or "Ref" in value_key:
+            #         log.error(
+            #             f"Found instrinsic function {value_key} in {logical_id}'s Properties!"
+            #         )
+            #         log.debug(f"Converting {prop_value} to {prop_value[value_key]}")
+            #         fields["Properties"][prop_name] = prop_value[value_key]
 
             cf_resource = cf.Resource(logical_id, fields)
 

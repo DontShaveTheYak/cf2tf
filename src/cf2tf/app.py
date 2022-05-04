@@ -3,7 +3,7 @@ import click
 from pathlib import Path
 from cf2tf.terraform import code, Configuration
 from cf2tf.cloudformation import Template
-from cf2tf.convert import TerraformConverter
+from cf2tf.convert import TerraformConverter, parse_template
 from pprint import pprint
 
 import logging
@@ -29,20 +29,18 @@ def cli(template_path: str):
     log.info(f"Converting {tmpl_path.name} to Terraform!")
     log.debug(f"Template location is {tmpl_path}")
 
-    cf_template = Template.from_yaml(tmpl_path).render()
+    # cf_template = Template.from_yaml(tmpl_path).render()
 
-    # print(json.dumps(cf_template, indent=2, default=str))
-
-    # cf_template.render()
-
-    # raise Exception()
+    cf_template = Template.from_yaml(tmpl_path).template
 
     # Need to get the code from the repo
     search_manger = code.search_manager()
 
-    converter = TerraformConverter(cf_template, search_manger)
+    # converter = TerraformConverter(cf_template, search_manger)
 
-    converted_objects = converter.convert()
+    # converted_objects = converter.convert()
+
+    converted_objects = parse_template(cf_template, search_manger)
 
     config = Configuration("./", converted_objects)
 

@@ -8,13 +8,16 @@ import base64 as b64
 import ipaddress
 import json
 import re
-from threading import local
 from typing import Any, Callable, Dict, List, TYPE_CHECKING, Union
 
 import requests
 
+from cf2tf.terraform.code import Resource, Var, Data
+from cf2tf.convert import matcher
+
 if TYPE_CHECKING:
-    from cf2tf.cloudformation import Template
+    # from cf2tf.cloudformation import Template
+    from cf2tf.terraform import Configuration as Template
 
 Dispatch = Dict[str, Callable[..., Any]]
 
@@ -359,18 +362,29 @@ def get_att(template: "Template", values: Any) -> str:
             )
         )
 
-    resource_name = values[0]
-    att_name = values[1]
+    cf_name = values[0]
+    cf_property = values[1]
 
-    if not isinstance(resource_name, str) or not isinstance(att_name, str):
+    if not isinstance(cf_name, str) or not isinstance(cf_property, str):
         raise TypeError(
             "Fn::GetAtt - logicalNameOfResource and attributeName must be String."
         )
 
-    if resource_name not in template.template["Resources"]:
-        raise KeyError(f"Fn::GetAtt - Resource {resource_name} not found in template.")
+    resource = template.get_resource(cf_name)
 
-    return f"{resource_name}.{att_name}"
+    if not resource:
+        raise KeyError(f"Fn::GetAtt - Resource {cf_name} not found in template.")
+
+    result = matcher(cf_property, resource.all_attributes, 50)
+
+    if not result:
+        raise ValueError(
+            f"Could not convert Cloudformation property {cf_property} to Terraform attribute."
+        )
+
+    name, _ = result
+
+    return f"aws_{resource.type}.{resource.name}.{name}"
 
 
 def get_azs(_t: "Template", region: Any) -> List[str]:
@@ -395,35 +409,14 @@ def get_azs(_t: "Template", region: Any) -> List[str]:
     return get_region_azs(region)
 
 
+# todo Handle functions that are not applicable to terraform.
 def import_value(template: "Template", name: Any) -> str:
-    """Solves AWS ImportValue intrinsic function.
+    # I'm not sure how to handle this but I think if any exception is encountered while
+    # converting cf expressions to terraform, we should just comment out the entire line.
 
-    Args:
-        template (Template): The template being tested.
-        name (Any): The name of the Export to be Imported.
-
-    Raises:
-        TypeError: If name is not a String.
-        ValueError: If no imports have been configured.
-        KeyError: If name is not found in the imports.
-
-    Returns:
-        str: The value of name from the configured imports.
-    """
-
-    if not isinstance(name, str):
-        raise TypeError(
-            "Fn::ImportValue - The name of the Export "
-            f"should be String, not {type(name).__name__}."
-        )
-
-    if not template.imports:
-        raise ValueError("Fn::ImportValue - No imports have been configued.")
-
-    if name not in template.imports:
-        raise KeyError(f"Fn::ImportValue - {name} not found in the configured imports.")
-
-    return template.imports[name]
+    raise Exception(
+        "Fn::Import Is Cloudformation native and unable to be converted to a Terraform expression."
+    )
 
 
 def join(_t: "Template", values: Any) -> str:
@@ -710,21 +703,33 @@ def ref(template: "Template", var_name: str) -> Any:
         # we don't want to update the class var for every run.
         if pseudo == "Region":
 
-            # Create the region data source data "aws_region" "current" {}
-            template.template["Data"] = {"aws_region": {"Name": "current"}}
-            return "aws_region.current.name"
+            region_data = Data("current", "region", {})
+
+            template.resources.append(region_data)
+
+            return "data.aws_region.current.name"
         try:
             return getattr(template, pseudo)
         except AttributeError:
             raise ValueError(f"Unrecognized AWS Pseduo variable: '{var_name}'.")
 
-    if var_name in template.template["Parameters"]:
-        return f"var.{var_name}"
+    item = template.resource_lookup(var_name)
 
-    if var_name in template.template["Resources"]:
-        return f"SOME_TYPE.{var_name}.???"
+    if not item:
+        raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
 
-    raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
+    if isinstance(item, Var):
+        return f"var.{item.name}"
+
+    if isinstance(item, Resource):
+        first_attr = next(iter(item.attributes))
+        return f"aws_{item.type}.{item.name}.{first_attr}"
+
+    # if var_name in template.template["Parameters"]:
+    #     return f"var.{var_name}"
+
+    # if var_name in template.template["Resources"]:
+    #     return f"SOME_TYPE.{var_name}.???"
 
 
 def wrap_in_curlys(input: str) -> str:
