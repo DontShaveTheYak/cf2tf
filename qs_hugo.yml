@@ -14,7 +14,7 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
   CodeCommitRepo:
-    Type: AWS::CodeCommit::Repository "code commit repository"
+    Type: AWS::CodeCommit::Repository
     Properties:
       RepositoryDescription: Repository to host content of the Hugo website
       RepositoryName: !Ref RepoName
