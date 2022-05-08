@@ -1,20 +1,19 @@
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 import re
-from cf2tf.terraform.code import SearchManager, Var, Resource, Output
-from cf2tf import terraform as tf
+from cf2tf.terraform.code import SearchManager
+from cf2tf.terraform.hcl2 import Variable, Resource, Block, Output
+import cf2tf.conversion.expressions
 from cf2tf import cloudformation as cf
 from cf2tf.terraform import doc_file
-from thefuzz import process, fuzz
+from thefuzz import process
 
 CFDict = Dict[str, Dict[str, Any]]
 log = logging.getLogger("cf2tf")
 
-# Might need to make this entire file a class, so I dont have to pass SearchManger
-# on to convert_resources
 
-
-def parse_template(cf_template: CFDict, search_manager: SearchManager):
+def parse_template(cf_template: CFDict, search_manager: SearchManager) -> List[Block]:
 
     vars = parse_vars(cf_template["Parameters"])
 
@@ -27,7 +26,27 @@ def parse_template(cf_template: CFDict, search_manager: SearchManager):
 
 def parse_vars(cf_params: CFDict):
 
-    return [Var(var_name, values) for var_name, values in cf_params.items()]
+    return [create_tf_var(var_name, values) for var_name, values in cf_params.items()]
+
+
+def create_tf_var(cf_name, cf_props):
+
+    log.debug(f"Converting Cloudformation Parameter - {cf_name} to Terraform.")
+
+    tf_name = pascal_to_snake(cf_name)
+    log.debug(f"Converted name to {tf_name}")
+
+    tmp_props: Dict[str, Any] = {
+        "description": cf_props.get("Description", ""),
+        "type": cf_props.get("Type", "").lower(),
+        "default": cf_props.get("Default", ""),
+    }
+
+    converted_arguments = {k: v for k, v in tmp_props.items() if v != ""}
+    log.debug(f"Converted properties to {converted_arguments}")
+    print()
+
+    return Variable(tf_name, converted_arguments)
 
 
 def parse_resources(cf_resources: CFDict, search_manager: SearchManager):
@@ -45,205 +64,154 @@ def get_cf_resources(cf_resources: CFDict):
 
 def get_tf_resource(cf_resource: cf.Resource, search_manager: SearchManager):
 
+    log.debug(
+        f"Converting Cloudformation resource {cf_resource.logical_id} to Terraform."
+    )
+
+    tf_name = pascal_to_snake(cf_resource.logical_id)
+    log.debug(f"Converted name to {tf_name}")
+
     docs_path = search_manager.find(cf_resource.type)
 
-    all_tf_attrs = doc_file.parse_attributes(docs_path)
+    log.debug(f"Found documentation file {docs_path}")
 
-    return tf.Resource(cf_resource, docs_path, all_tf_attrs)
+    valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
+
+    log.debug(
+        f"Parsed the following arguments from the documentation: \n{valid_arguments}"
+    )
+
+    log.debug(
+        f"Parsed the following attributes from the documentation: \n{valid_attributes}"
+    )
+
+    tf_type = create_resource_type(docs_path)
+
+    log.debug(f"Converted type from {cf_resource.type} to {tf_type}")
+
+    arguments = props_to_args(cf_resource.properties, valid_arguments, docs_path)
+
+    print()
+
+    return Resource(tf_name, tf_type, arguments, valid_arguments, valid_attributes)
+
+
+def props_to_args(
+    cf_props: Dict[str, Any], valid_tf_arguments: List[str], docs_path: Path
+):
+
+    # Search works better if we split the words apart, but we have to put it back together later
+    search_items = [item.replace("_", " ") for item in valid_tf_arguments]
+
+    converted_attrs: Dict[str, Any] = {}
+
+    for prop_name, prop_value in cf_props.items():
+
+        if prop_name in cf2tf.conversion.expressions.ALL_FUNCTIONS:
+            log.debug(f"Skipping Cloudformation function {prop_name}.")
+            converted_attrs[prop_name] = prop_value
+            continue
+
+        search_term = camel_case_split(prop_name)
+
+        log.debug(f"Searching for {search_term} instead of {prop_name}")
+
+        result = matcher(search_term, search_items, 50)
+
+        if not result:
+            log.debug(f"No match found for {prop_name}, commenting out this argument.")
+            converted_attrs[f"// CF Property - {prop_name}"] = prop_value
+            continue
+
+        attribute_match, ranking = result
+
+        # Putting the underscore back in
+        tf_arg_name = attribute_match.replace(" ", "_")
+
+        log.debug(f"Converted {prop_name} to {tf_arg_name} with {ranking}% match.")
+
+        # Terraform sometimes has nested blocks, if prop_value is a map, its possible
+        # that tf_attribute_name is a nested block in terraform
+
+        if isinstance(prop_value, dict):
+            section_name = find_section(tf_arg_name, docs_path)
+
+            if not section_name:
+                converted_attrs[tf_arg_name] = prop_value
+                continue
+
+            valid_sub_args = doc_file.read_section(docs_path, section_name)
+
+            log.debug(f"Valid {tf_arg_name} arguments are {valid_sub_args}")
+
+            sub_attrs = props_to_args(prop_value, valid_sub_args, docs_path)
+            converted_attrs[tf_arg_name] = sub_attrs
+            continue
+
+        converted_attrs[tf_arg_name] = prop_value
+
+    log.debug(f"Converted {cf_props.keys()} to {converted_attrs.keys()}")
+
+    return converted_attrs
 
 
 def parse_outputs(cf_outputs: CFDict):
 
-    return [Output(output_name, values) for output_name, values in cf_outputs.items()]
+    return [create_tf_output(name, values) for name, values in cf_outputs.items()]
 
 
-class TerraformConverter:
-    def __init__(self, cf_template: CFDict, search_manager: SearchManager) -> None:
-        self.cf_template = cf_template
-        self.search_manager = search_manager
+def create_tf_output(cf_name, cf_props):
 
-    def convert(self):
+    log.debug(f"Converting Cloudformation Output - {cf_name} to Terraform.")
 
-        # for var in self.convert_vars(self.cf_template["Parameters"]):
-        #     print(var.convert())
+    tf_name = pascal_to_snake(cf_name)
+    log.debug(f"Converted name to {tf_name}")
 
-        vars = [var for var in self.convert_vars(self.cf_template["Parameters"])]
+    tmp_props: Dict[str, Any] = {
+        "description": cf_props.get("Description", ""),
+        "value": cf_props.get("Value"),
+    }
 
-        # for resource in self.convert_resources(self.cf_template["Resources"]):
-        #     print(resource.write())
-        #     print()
+    converted_args = {k: v for k, v in tmp_props.items() if v != ""}
+    log.debug(f"Converted properties to {converted_args}")
+    log.debug("")
 
-        resources = [
-            resource
-            for resource in self.convert_resources(self.cf_template["Resources"])
-        ]
+    return Output(tf_name, converted_args)
 
-        # return vars + resources
 
-        # for output in self.convert_outputs(self.cf_template["Outputs"]):
-        #     print(output.convert())
+def find_section(tf_attribute_name: str, docs_path: Path):
+    """Checks to see if the attribute is also a subsection in the terraform documentation
 
-        outputs = [
-            output for output in self.convert_outputs(self.cf_template["Outputs"])
-        ]
+    Args:
+        tf_attribute_name (str): A terraform attribute name.
 
-        return vars + resources + outputs
+    Returns:
+        str: The name of the section if found, otherwise none.
+    """
 
-    def convert_vars(self, cf_params: CFDict):
+    log.debug(f"Checking if {tf_attribute_name} has a section in {docs_path}.")
 
-        for var_name, values in cf_params.items():
-            yield Var(var_name, values)
+    # Search works better if we split the words apart, but we have to put it back together later
+    search_term = tf_attribute_name.replace("_", " ")
 
-    def convert_resources(self, cf_resources: CFDict):
+    search_items = doc_file.all_sections(docs_path)
 
-        for logical_id, fields in cf_resources.items():
+    result = matcher(search_term, search_items, 90)
 
-            # We need to handle instrinsic functions before we get here, but for now...
-            # dirty hack
+    if not result:
+        log.warn(f"{tf_attribute_name} does not have a section in {docs_path}")
+        return ""
 
-            # for prop_name, prop_value in fields.get("Properties", {}).items():
+    result_name, ranking = result
 
-            # if isinstance(prop_value, dict):
+    log.debug(f"Found section {result_name} with {ranking}% match.")
 
-            #     # Get a key from the dict
-            #     value_key: str = next(iter(prop_value))
+    return result_name
 
-            #     if "Fn::" in value_key or "Ref" in value_key:
-            #         log.error(
-            #             f"Found instrinsic function {value_key} in {logical_id}'s Properties!"
-            #         )
-            #         log.debug(f"Converting {prop_value} to {prop_value[value_key]}")
-            #         fields["Properties"][prop_name] = prop_value[value_key]
 
-            cf_resource = cf.Resource(logical_id, fields)
-
-            resource_converter = ResourceConverter(cf_resource, self.search_manager)
-            yield resource_converter.convert()
-            # docs_path = self.search_manager.find(cf_attributes["Type"])
-
-            # yield Resource(cf_resource_name, cf_attributes["Properties"], docs_path)
-
-    def convert_outputs(self, cf_params: CFDict):
-
-        for var_name, values in cf_params.items():
-            yield Output(var_name, values)
-
-
-class ResourceConverter:
-    def __init__(self, cf_resource: cf.Resource, terraform_docs: SearchManager) -> None:
-        self.cf_resource = cf_resource
-        self.terraform_docs = terraform_docs
-        self.docs_path = self.terraform_docs.find(self.cf_resource.type)
-
-    def convert(self):
-        """Converts a Cloudformation resource into a Terraform one."""
-        # log.debug(cf_resource)
-        log.debug(f"Converting {self.cf_resource.logical_id} to Terraform.")
-
-        docs_path = self.terraform_docs.find(self.cf_resource.type)
-
-        log.debug(f"Using values from {docs_path} for conversion.")
-
-        all_tf_attrs = doc_file.parse_attributes(docs_path)
-
-        log.debug(f"Valid Terraform attributes are {all_tf_attrs}")
-
-        log.debug(self.cf_resource)
-
-        converted_attributes = self.attributes(
-            self.cf_resource.properties, all_tf_attrs
-        )
-
-        log.debug(f"Converted attributes are {converted_attributes}")
-
-        return tf.Resource(
-            self.cf_resource.logical_id,
-            docs_path.name.split(".")[0],
-            converted_attributes,
-            all_tf_attrs,
-        )
-
-    def attributes(self, cf_props: Dict[str, Any], valid_tf_attributes: List[str]):
-        """Converts cloudformation propeties into terraform attributes."""
-
-        # Search works better if we split the words apart, but we have to put it back together later
-        search_items = [item.replace("_", " ") for item in valid_tf_attributes]
-
-        converted_attrs: Dict[str, Any] = {}
-
-        for prop_name, prop_value in cf_props.items():
-
-            search_term = camel_case_split(prop_name)
-
-            log.debug(f"Searching for {search_term} instead of {prop_name}")
-
-            result = matcher(search_term, search_items, 50)
-
-            if not result:
-                converted_attrs[f"// CF Property - {prop_name}"] = prop_value
-                continue
-
-            attribute_match, ranking = result
-
-            # Putting the underscore back in
-            tf_attribute_name = attribute_match.replace(" ", "_")
-
-            log.debug(
-                f"Converted {prop_name} to {tf_attribute_name} with {ranking}% match."
-            )
-
-            # Terraform sometimes has nested blocks, if prop_value is a map, its possible
-            # that tf_attribute_name is a nested block in terraform
-
-            if isinstance(prop_value, dict):
-                section_name = self.find_section(tf_attribute_name)
-
-                if not section_name:
-                    converted_attrs[tf_attribute_name] = prop_value
-                    continue
-
-                valid_sub_attributes = doc_file.read_section(
-                    self.docs_path, section_name
-                )
-
-                log.debug(f"Valid Terraform attributes are {valid_sub_attributes}")
-
-                sub_attrs = self.attributes(prop_value, valid_sub_attributes)
-                converted_attrs[tf_attribute_name] = sub_attrs
-                continue
-
-            converted_attrs[tf_attribute_name] = prop_value
-
-        return converted_attrs
-
-    def find_section(self, tf_attribute_name: str):
-        """Checks to see if the attribute is also a subsection in the terraform documentation
-
-        Args:
-            tf_attribute_name (str): A terraform attribute name.
-
-        Returns:
-            str: The name of the section if found, otherwise none.
-        """
-
-        log.debug(f"Checking if {tf_attribute_name} has a section in {self.docs_path}.")
-
-        # Search works better if we split the words apart, but we have to put it back together later
-        search_term = tf_attribute_name.replace("_", " ")
-
-        search_items = doc_file.all_sections(self.docs_path)
-
-        result = matcher(search_term, search_items, 90)
-
-        if not result:
-            log.warn(f"{tf_attribute_name} does not have a section in {self.docs_path}")
-            return ""
-
-        result_name, ranking = result
-
-        log.debug(f"Found section {result_name} with {ranking}% match.")
-
-        return result_name
+def pascal_to_snake(name: str):
+    name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
 
 def matcher(search_term: str, search_items: List[str], score_cutoff=0):
@@ -264,3 +232,8 @@ def camel_case_split(str) -> str:
     items = re.findall(r"[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))", str)
 
     return " ".join(items)
+
+
+def create_resource_type(doc_path: Path):
+    file_base_name = doc_path.name.split(".")[0]
+    return f"aws_{file_base_name}"

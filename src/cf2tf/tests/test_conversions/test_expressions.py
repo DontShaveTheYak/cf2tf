@@ -1,13 +1,15 @@
-from ast import expr
 from cf2tf.conversion import expressions
-from cf2tf.cloudformation import Template, _template
+from cf2tf.terraform import Configuration
+from pathlib import Path
 
 import pytest
 
+from cf2tf.terraform.hcl2 import Variable
+
 
 @pytest.fixture(scope="session")
-def fake_t() -> Template:
-    return Template({})
+def fake_t() -> Configuration:
+    return Configuration(Path(), [])
 
 
 join_tests = [
@@ -16,8 +18,8 @@ join_tests = [
     (None, ["-", ["A", "var.thing", "C"]], 'join("-", ["A", var.thing, "C"])'),
     (
         None,
-        ["-", ["A", "SOME_TYPE.name.attr", "C"]],
-        'join("-", ["A", SOME_TYPE.name.attr, "C"])',
+        ["-", ["A", "aws_resource.name.attr", "C"]],
+        'join("-", ["A", aws_resource.name.attr, "C"])',
     ),
 ]
 
@@ -32,17 +34,15 @@ def test_join(fake_t, expression, expected):
 
 def test_ref():
     """A reference in cloudformation is a direct reference to a variable."""
-    template = {"Parameters": {"foo": {"Value": "bar"}}, "Resources": {}}
 
-    # _template.add_metadata(template, Template.Region)
+    var = Variable("foo", {"value": "bar"})
+    resources = [var]
 
-    template = Template(template)
+    tf_config = Configuration(Path(), resources)
 
-    some_var = "foo"
+    expected_value = f"var.{var.name}"
 
-    expected_value = f"var.{some_var}"
-
-    assert expected_value == expressions.ref(template, some_var)
+    assert expected_value == expressions.ref(tf_config, var.name)
 
 
 def test_select(fake_t):
@@ -78,17 +78,16 @@ def test_split(fake_t):
 def test_sub():
     """A Sub in cf is a string that contains references to variables, resources or AWS pseudo parameters."""
 
-    template = {"Parameters": {"foo": {"Value": "bar"}}, "Resources": {}}
+    var = Variable("foo", {"value": "bar"})
+    resources = [var]
 
-    template = Template(template)
+    tf_config = Configuration(Path(), resources)
 
-    some_var = "foo"
+    expected_value = f"test ${{var.{var.name}}} string"
 
-    expected_value = f"test ${{var.{some_var}}} string"
+    test_string = f"test ${{{var.name}}} string"
 
-    test_string = "test ${foo} string"
-
-    assert expected_value == expressions.sub_s(template, test_string)
+    assert expected_value == expressions.sub_s(tf_config, test_string)
 
 
 def test_transform(fake_t):

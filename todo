@@ -1,0 +1,10 @@
+Convert remaining Cloudformation functions to terraform
+Move Data from code.py to hcl2
+Comment out invalid blocks like the "policy" block.
+Add comment to top of resource about where it was converted from
+Improve helpers to find things like resources and functions
+Better comments for missing attributes
+Write tests
+Code linting and formating, typing
+CICD
+First release 75-80% automated

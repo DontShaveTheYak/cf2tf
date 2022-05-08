@@ -12,11 +12,11 @@ from typing import Any, Callable, Dict, List, TYPE_CHECKING, Union
 
 import requests
 
-from cf2tf.terraform.code import Resource, Var, Data
+from cf2tf.terraform.code import Data
 from cf2tf.convert import matcher
+from cf2tf.terraform.hcl2 import Variable, Resource, use_quotes
 
 if TYPE_CHECKING:
-    # from cf2tf.cloudformation import Template
     from cf2tf.terraform import Configuration as Template
 
 Dispatch = Dict[str, Callable[..., Any]]
@@ -370,12 +370,12 @@ def get_att(template: "Template", values: Any) -> str:
             "Fn::GetAtt - logicalNameOfResource and attributeName must be String."
         )
 
-    resource = template.get_resource(cf_name)
+    resource = template.block_lookup(cf_name)
 
     if not resource:
         raise KeyError(f"Fn::GetAtt - Resource {cf_name} not found in template.")
 
-    result = matcher(cf_property, resource.all_attributes, 50)
+    result = matcher(cf_property, resource.valid_attributes, 50)
 
     if not result:
         raise ValueError(
@@ -384,7 +384,29 @@ def get_att(template: "Template", values: Any) -> str:
 
     name, _ = result
 
-    return f"aws_{resource.type}.{resource.name}.{name}"
+    if "." in cf_property:
+        return nested_attr(resource, cf_property, name)
+
+    return f"{resource.type}.{resource.name}.{name}"
+
+
+def nested_attr(resource: Resource, cf_prop: str, tf_attr: str):
+
+    if resource.type == "aws_cloudformation_stack" and tf_attr == "outputs":
+        return get_attr_nested_stack(resource, cf_prop, tf_attr)
+
+    raise Exception(f"Unable to solve nested GetAttr {cf_prop}")
+
+
+def get_attr_nested_stack(resource: Resource, cf_property, tf_attr):
+    items = cf_property.split(".")
+
+    if len(items) > 2:
+        raise Exception(f"Error parsing nested stack output for {cf_property}")
+
+    _, stack_output_name = items
+
+    return f"{resource.type}.{resource.name}.{tf_attr}.{stack_output_name}"
 
 
 def get_azs(_t: "Template", region: Any) -> List[str]:
@@ -462,17 +484,12 @@ def join(_t: "Template", values: Any) -> str:
     if isinstance(items, str):
         return f'join("{delimiter}", {items})'
 
-    # items = str(items).replace("'", '"')
-
     return f'join("{delimiter}", {_terraform_list(items)})'
 
 
 def _terraform_list(items: List[Any]):
 
-    items = [
-        item if item.startswith("SOME_TYPE") or item.startswith("var.") else f'"{item}"'
-        for item in items
-    ]
+    items = [use_quotes(item) for item in items]
 
     return f"[{', '.join(items)}]"
 
@@ -696,6 +713,8 @@ def ref(template: "Template", var_name: str) -> Any:
         Any: Terraform equivalent expression.
     """
 
+    # var_name = pascal_to_snake(var_name)
+
     if "AWS::" in var_name:
         pseudo = var_name.replace("AWS::", "")
 
@@ -703,9 +722,10 @@ def ref(template: "Template", var_name: str) -> Any:
         # we don't want to update the class var for every run.
         if pseudo == "Region":
 
-            region_data = Data("current", "region", {})
-
-            template.resources.append(region_data)
+            # todo This is a bug, multiple blocks can have the same name as long as they have different block types
+            if not template.block_lookup("current"):
+                region_data = Data("current", "region", {})
+                template.resources.insert(0, region_data)
 
             return "data.aws_region.current.name"
         try:
@@ -713,23 +733,19 @@ def ref(template: "Template", var_name: str) -> Any:
         except AttributeError:
             raise ValueError(f"Unrecognized AWS Pseduo variable: '{var_name}'.")
 
-    item = template.resource_lookup(var_name)
+    item = template.block_lookup(var_name)
 
     if not item:
         raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
 
-    if isinstance(item, Var):
+    if isinstance(item, Variable):
         return f"var.{item.name}"
 
     if isinstance(item, Resource):
-        first_attr = next(iter(item.attributes))
-        return f"aws_{item.type}.{item.name}.{first_attr}"
+        first_attr = next(iter(item.valid_attributes))
+        return f"{item.type}.{item.name}.{first_attr}"
 
-    # if var_name in template.template["Parameters"]:
-    #     return f"var.{var_name}"
-
-    # if var_name in template.template["Resources"]:
-    #     return f"SOME_TYPE.{var_name}.???"
+    raise ValueError(f"Unable to solve Reference for {var_name}")
 
 
 def wrap_in_curlys(input: str) -> str:

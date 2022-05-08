@@ -6,16 +6,13 @@ import re
 
 def parse_attributes(docs_path: Path):
 
-    tf_attributes: List[str] = []
     with open(docs_path) as file:
 
         arguments = parse_section("Argument Reference", file)
-        tf_attributes.extend(arguments)
 
         attributes = parse_section("Attributes Reference", file)
-        tf_attributes.extend(attributes)
 
-    return tf_attributes
+    return (arguments, attributes)
 
 
 def read_section(docs_path: Path, section_name: str):
