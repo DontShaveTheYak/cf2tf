@@ -13,7 +13,7 @@ from typing import Any, Callable, Dict, List, TYPE_CHECKING, Union
 import requests
 
 import cf2tf.convert
-from cf2tf.terraform.hcl2 import Variable, Resource, use_quotes, Data
+import cf2tf.terraform.hcl2 as hcl2
 
 if TYPE_CHECKING:
     from cf2tf.terraform import Configuration as Template
@@ -389,7 +389,7 @@ def get_att(template: "Template", values: Any) -> str:
     return f"{resource.type}.{resource.name}.{name}"
 
 
-def nested_attr(resource: Resource, cf_prop: str, tf_attr: str):
+def nested_attr(resource: hcl2.Resource, cf_prop: str, tf_attr: str):
 
     if resource.type == "aws_cloudformation_stack" and tf_attr == "outputs":
         return get_attr_nested_stack(resource, cf_prop, tf_attr)
@@ -397,7 +397,7 @@ def nested_attr(resource: Resource, cf_prop: str, tf_attr: str):
     raise Exception(f"Unable to solve nested GetAttr {cf_prop}")
 
 
-def get_attr_nested_stack(resource: Resource, cf_property, tf_attr):
+def get_attr_nested_stack(resource: hcl2.Resource, cf_property, tf_attr):
     items = cf_property.split(".")
 
     if len(items) > 2:
@@ -430,8 +430,8 @@ def get_azs(template: "Template", region: Any) -> str:
             f"Fn::GetAZs - The region must be a String, not {type(region).__name__}."
         )
 
-    if not template.block_lookup("availability_zones"):
-        az_data = Data("available", "availability_zones", {"state": "available"})
+    if not template.block_lookup("availability_zones", hcl2.Data):
+        az_data = hcl2.Data("available", "availability_zones", {"state": "available"})
         template.resources.insert(0, az_data)
 
     return "data.aws_availability_zones.available.names"
@@ -495,7 +495,7 @@ def join(_t: "Template", values: Any) -> str:
 
 def _terraform_list(items: List[Any]):
 
-    items = [use_quotes(item) for item in items]
+    items = [hcl2.use_quotes(item) for item in items]
 
     return f"[{', '.join(items)}]"
 
@@ -729,8 +729,8 @@ def ref(template: "Template", var_name: str) -> Any:
         if pseudo == "Region":
 
             # todo This is a bug, multiple blocks can have the same name as long as they have different block types
-            if not template.block_lookup("current"):
-                region_data = Data("current", "region", {})
+            if not template.block_lookup("current", block_type=hcl2.Data):
+                region_data = hcl2.Data("current", "region", {})
                 template.resources.insert(0, region_data)
 
             return "data.aws_region.current.name"
@@ -739,15 +739,15 @@ def ref(template: "Template", var_name: str) -> Any:
         except AttributeError:
             raise ValueError(f"Unrecognized AWS Pseduo variable: '{var_name}'.")
 
-    item = template.block_lookup(var_name)
+    item = template.block_lookup(var_name, block_type=hcl2.Block)
 
     if not item:
         raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
 
-    if isinstance(item, Variable):
+    if isinstance(item, hcl2.Variable):
         return f"var.{item.name}"
 
-    if isinstance(item, Resource):
+    if isinstance(item, hcl2.Resource):
         first_attr = next(iter(item.valid_attributes))
         return f"{item.type}.{item.name}.{first_attr}"
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from cf2tf.terraform.hcl2 import Variable
+import cf2tf.terraform.hcl2 as hcl2
 
 
 @pytest.fixture(scope="session")
@@ -29,7 +29,7 @@ def test_get_azs(fake_t: Configuration):
     assert result == expected
 
     # Make sure the datasource was added correctly
-    assert fake_t.block_lookup("available")
+    assert fake_t.block_lookup("available", block_type=hcl2.Data)
 
 
 join_tests = [
@@ -55,7 +55,7 @@ def test_join(fake_t, expression, expected):
 def test_ref():
     """A reference in cloudformation is a direct reference to a variable."""
 
-    var = Variable("foo", {"value": "bar"})
+    var = hcl2.Variable("foo", {"value": "bar"})
     resources = [var]
 
     tf_config = Configuration(Path(), resources)
@@ -98,7 +98,7 @@ def test_split(fake_t):
 def test_sub():
     """A Sub in cf is a string that contains references to variables, resources or AWS pseudo parameters."""
 
-    var = Variable("foo", {"value": "bar"})
+    var = hcl2.Variable("foo", {"value": "bar"})
     resources = [var]
 
     tf_config = Configuration(Path(), resources)

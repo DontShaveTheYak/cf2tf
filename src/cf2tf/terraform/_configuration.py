@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from cf2tf.conversion import expressions as functions
 
@@ -100,27 +100,25 @@ class Configuration:
 
         return False
 
-    def block_lookup(self, name: str) -> Optional[Block]:
+    def block_lookup(self, name: str, block_type: Type[Block]) -> Optional[Block]:
 
         name = cf2tf.convert.pascal_to_snake(name)
 
-        # log.debug(f"Searching for terraform block named {name}")
+        for block in self.blocks_by_type(block_type):
 
-        for resource in self.resources:
-            if isinstance(resource, Output):
-                continue
+            if name in block.labels:
+                return block
 
-            # log.debug(f"Checking {resource.name}")
-            if resource.name == name:
-                return resource
+    def blocks_by_type(self, block_type: Type[Block]):
+        return [block for block in self.resources if isinstance(block, block_type)]
 
 
-def resource_lookup(config: "Configuration", name: str):
+# def resource_lookup(config: "Configuration", name: str):
 
-    for resource in config.resources:
+#     for resource in config.resources:
 
-        if hasattr(resource, "cf_resource") and resource.cf_resource.logical_id == name:
-            return resource
-        else:
-            if resource.name == name:
-                return resource
+#         if hasattr(resource, "cf_resource") and resource.cf_resource.logical_id == name:
+#             return resource
+#         else:
+#             if resource.name == name:
+#                 return resource
