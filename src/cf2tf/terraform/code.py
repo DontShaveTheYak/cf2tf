@@ -3,8 +3,6 @@ from git.repo.base import Repo
 from git import RemoteProgress
 import logging
 
-
-from typing import Dict, Any
 from thefuzz import process, fuzz
 
 import click
@@ -96,23 +94,3 @@ class CloneProgress(RemoteProgress):
 
     def create_pbar(self, max_count):
         self.pbar = click.progressbar(length=max_count)
-
-
-class Data:
-    def __init__(self, name: str, type: str, attributes: Dict[str, Any]) -> None:
-        self.name = name
-        self.type = type
-        self.attributes = attributes
-
-    def write(self):
-
-        code_block = f'data "aws_{self.type}" "{self.name}" {{\n'
-
-        for name, value in self.attributes.items():
-
-            if isinstance(value, dict):
-                code_block = code_block + "\n\n" + self.create_subsection(name, value)
-                continue
-            code_block = code_block + f"\n  {name} = {use_quotes(value)}"
-
-        return code_block + "\n}\n"

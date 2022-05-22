@@ -24,6 +24,9 @@ class Block:
         self.valid_arguments = valid_arguments
         self.valid_attributes = valid_attributes
 
+    def __repr__(self) -> str:
+        return f"{self.block_type}.{'.'.join(self.labels)}"
+
     def write(self):
 
         code_block = ""
@@ -67,11 +70,19 @@ class Data(Block):
         name: str,
         type: str,
         arguments: Dict[str, Any],
-        attributes: Dict[str, Any],
     ) -> None:
         self.name = name
         self.type = type
-        super().__init__("data", [self.type, self.name], arguments, attributes)
+
+        valid_arguments = ["state"]
+        valid_attributes = ["state", "names"]
+        super().__init__(
+            "data",
+            [self.type, self.name],
+            arguments,
+            valid_arguments,
+            valid_attributes,
+        )
 
 
 class Resource(Block):
