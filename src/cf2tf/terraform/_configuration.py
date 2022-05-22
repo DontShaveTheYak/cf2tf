@@ -4,9 +4,8 @@ from typing import Any, Dict, List, Optional
 
 from cf2tf.conversion import expressions as functions
 
-from .code import Data
-from cf2tf.terraform.hcl2 import Block, Variable, Output
-from cf2tf.convert import pascal_to_snake
+from cf2tf.terraform.hcl2 import Block, Variable, Output, Data
+import cf2tf.convert
 import logging
 
 log = logging.getLogger("cf2tf")
@@ -103,7 +102,7 @@ class Configuration:
 
     def block_lookup(self, name: str) -> Optional[Block]:
 
-        name = pascal_to_snake(name)
+        name = cf2tf.convert.pascal_to_snake(name)
 
         # log.debug(f"Searching for terraform block named {name}")
 
