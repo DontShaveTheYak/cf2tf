@@ -12,9 +12,8 @@ from typing import Any, Callable, Dict, List, TYPE_CHECKING, Union
 
 import requests
 
-from cf2tf.terraform.code import Data
-from cf2tf.convert import matcher
-from cf2tf.terraform.hcl2 import Variable, Resource, use_quotes
+import cf2tf.convert
+from cf2tf.terraform.hcl2 import Variable, Resource, use_quotes, Data
 
 if TYPE_CHECKING:
     from cf2tf.terraform import Configuration as Template
@@ -333,7 +332,7 @@ def find_in_map(template: "Template", values: Any) -> Any:
 
 
 def get_att(template: "Template", values: Any) -> str:
-    """Solves AWS GetAtt intrinsic function.
+    """Converts AWS GetAtt intrinsic function to it's Terraform equivalent.
 
     Args:
         template (Template): The template being tested.
@@ -375,7 +374,7 @@ def get_att(template: "Template", values: Any) -> str:
     if not resource:
         raise KeyError(f"Fn::GetAtt - Resource {cf_name} not found in template.")
 
-    result = matcher(cf_property, resource.valid_attributes, 50)
+    result = cf2tf.convert.matcher(cf_property, resource.valid_attributes, 50)
 
     if not result:
         raise ValueError(
@@ -409,26 +408,33 @@ def get_attr_nested_stack(resource: Resource, cf_property, tf_attr):
     return f"{resource.type}.{resource.name}.{tf_attr}.{stack_output_name}"
 
 
-def get_azs(_t: "Template", region: Any) -> List[str]:
-    """Solves AWS GetAZs intrinsic function.
+def get_azs(template: "Template", region: Any) -> str:
+    """Converts AWS GetAZs intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): The template being tested.
+        template (Template): The Terraform Configuration.
         region (Any): The name of a region.
 
     Raises:
         TypeError: If region is not a string.
 
     Returns:
-        List[str]: The list of AZs for the provided region.
+        str: Terraform equivalent expression.
     """
+
+    # todo One issue here is that it appears Cloudformation allows you to lookup AZ's for any region,
+    # where Terraform only allows you to lookup AZ's for the current region
 
     if not isinstance(region, str):
         raise TypeError(
             f"Fn::GetAZs - The region must be a String, not {type(region).__name__}."
         )
 
-    return get_region_azs(region)
+    if not template.block_lookup("availability_zones"):
+        az_data = Data("available", "availability_zones", {"state": "available"})
+        template.resources.insert(0, az_data)
+
+    return "data.aws_availability_zones.available.names"
 
 
 # todo Handle functions that are not applicable to terraform.
