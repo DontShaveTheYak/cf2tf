@@ -12,6 +12,26 @@ def fake_t() -> Configuration:
     return Configuration(Path(), [])
 
 
+def test_find_in_map():
+    pass
+
+
+def test_get_azs(fake_t: Configuration):
+
+    # Lets test that only valid Cloudformation functions work correctly.
+    with pytest.raises(TypeError):
+        not_valid_region = []
+        _ = expressions.get_azs(fake_t, not_valid_region)
+
+    # test that the return value is correct
+    expected = "data.aws_availability_zones.available.names"
+    result = expressions.get_azs(fake_t, "Testing")
+    assert result == expected
+
+    # Make sure the datasource was added correctly
+    assert fake_t.block_lookup("available")
+
+
 join_tests = [
     (None, ["-", "var.something"], 'join("-", var.something)'),
     (None, ["-", ["A", "B", "C"]], 'join("-", ["A", "B", "C"])'),
