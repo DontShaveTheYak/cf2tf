@@ -249,32 +249,34 @@ def or_(_t: "Template", values: Any) -> bool:
     return any(values)
 
 
-def condition(template: "Template", name: Any) -> bool:
-    """Solves AWS Condition function.
+## I'm not sure the following was even a real thing :blush:
 
-    Args:
-        template (Template): The template being tested.
-        name (Any): The name of the condition.
+# def condition(template: "Template", name: Any) -> bool:
+#     """Solves AWS Condition function.
 
-    Raises:
-        TypeError: If name is not a String.
-        KeyError: If name not found in template conditions.
+#     Args:
+#         template (Template): The template being tested.
+#         name (Any): The name of the condition.
 
-    Returns:
-        bool: The value of the condition.
-    """
+#     Raises:
+#         TypeError: If name is not a String.
+#         KeyError: If name not found in template conditions.
 
-    if not isinstance(name, str):
-        raise TypeError(
-            f"Fn::Condition - The value must be a String, not {type(name).__name__}."
-        )
+#     Returns:
+#         bool: The value of the condition.
+#     """
 
-    if name not in template.template["Conditions"]:
-        raise KeyError(
-            f"Fn::Condition - Unable to find condition '{name}' in template."
-        )
+#     if not isinstance(name, str):
+#         raise TypeError(
+#             f"Fn::Condition - The value must be a String, not {type(name).__name__}."
+#         )
 
-    return template.template["Conditions"][name]
+#     if name not in template.template["Conditions"]:
+#         raise KeyError(
+#             f"Fn::Condition - Unable to find condition '{name}' in template."
+#         )
+
+#     return template.template["Conditions"][name]
 
 
 def find_in_map(template: "Template", values: Any) -> Any:
