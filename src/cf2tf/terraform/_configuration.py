@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Type
 
 from cf2tf.conversion import expressions as functions
 
-from cf2tf.terraform.hcl2 import Block, Variable, Output, Data
+from cf2tf.terraform.hcl2 import Block, Locals, Variable, Output, Data
 import cf2tf.convert
 import logging
 
@@ -37,7 +37,7 @@ class Configuration:
         for resource in self.resources:
 
             # These dont have anything to resolve
-            if isinstance(resource, (Variable, Data)):
+            if isinstance(resource, (Variable, Data, Locals)):
                 continue
 
             self.resolve_values(resource.arguments, functions.ALL_FUNCTIONS)

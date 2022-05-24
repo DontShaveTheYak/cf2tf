@@ -12,8 +12,61 @@ def fake_t() -> Configuration:
     return Configuration(Path(), [])
 
 
-def test_find_in_map():
-    pass
+def test_find_in_map(fake_t: Configuration):
+
+    # Test that it will only take a list
+    with pytest.raises(TypeError) as e:
+        expressions.find_in_map(fake_t, {})
+
+    assert "Fn::FindInMap - The values must be a List, not dict." in str(e)
+
+    # Test that it must contain three items
+
+    with pytest.raises(ValueError) as e:
+        expressions.find_in_map(fake_t, [""])
+
+    assert "MapName, TopLevelKey and SecondLevelKey." in str(e)
+
+    map_name = "RegionMap"
+    top_level_key = "us-east-1"
+    second_level_key = "HVM64"
+
+    with pytest.raises(ValueError) as e:
+        expressions.find_in_map(fake_t, ["a", "b", "c"])
+
+    assert "Unable to find a locals block" in str(e)
+
+    test_args = {map_name: {top_level_key: {second_level_key: "test value"}}}
+
+    locals_block = hcl2.Locals(test_args)
+
+    fake_t.resources.append(locals_block)
+
+    # Test for map name
+    with pytest.raises(KeyError) as e:
+        expressions.find_in_map(fake_t, ["fakeMap", top_level_key, second_level_key])
+
+    assert "Unable to find fakeMap" in str(e)
+
+    # Test for top level key
+    with pytest.raises(KeyError) as e:
+        expressions.find_in_map(fake_t, [map_name, "fake_top", second_level_key])
+
+    assert "Unable to find key fake_top" in str(e)
+
+    # test for second level key
+    with pytest.raises(KeyError) as e:
+        expressions.find_in_map(fake_t, [map_name, top_level_key, "fake_second"])
+
+    assert "Unable to find key fake_second" in str(e)
+
+    expected_result = f'local.{map_name}["{top_level_key}"]["{second_level_key}"]'
+
+    result = expressions.find_in_map(
+        fake_t, [map_name, top_level_key, second_level_key]
+    )
+
+    assert result == expected_result
 
 
 def test_get_att(fake_t: Configuration):

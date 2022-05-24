@@ -278,7 +278,7 @@ def condition(template: "Template", name: Any) -> bool:
 
 
 def find_in_map(template: "Template", values: Any) -> Any:
-    """Solves AWS FindInMap intrinsic function.
+    """Converts AWS FindInMap intrinsic function to it's Terraform equivalent.
 
     Args:
         template (Template): The template being tested.
@@ -290,7 +290,7 @@ def find_in_map(template: "Template", values: Any) -> Any:
         KeyError: If the Map or specified keys are missing.
 
     Returns:
-        Any: The requested value from the Map.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -310,13 +310,23 @@ def find_in_map(template: "Template", values: Any) -> Any:
     top_key = values[1]
     second_key = values[2]
 
-    if "Mappings" not in template.template:
-        raise KeyError("Unable to find Mappings section in template.")
+    # First we need to make sure that locals is a block present in the Terraform configuration.
+    blocks = template.blocks_by_type(hcl2.Locals)
 
-    maps = template.template["Mappings"]
+    if not blocks:
+        raise ValueError("Unable to find a locals block in the configuration.")
+
+    if len(blocks) > 1:
+        raise ValueError(
+            f"Expected one locals block but found {len(blocks)} blocks instead."
+        )
+
+    local_block: hcl2.Locals = blocks[0]
+
+    maps = local_block.arguments
 
     if map_name not in maps:
-        raise KeyError(f"Unable to find {map_name} in Mappings section of template.")
+        raise KeyError(f"Unable to find {map_name} in locals block.")
 
     map = maps[map_name]
 
@@ -328,7 +338,7 @@ def find_in_map(template: "Template", values: Any) -> Any:
     if second_key not in first_level:
         raise KeyError(f"Unable to find key {second_key} in map {map_name}.")
 
-    return first_level[second_key]
+    return f'local.{map_name}["{top_key}"]["{second_key}"]'
 
 
 def get_att(template: "Template", values: Any) -> str:

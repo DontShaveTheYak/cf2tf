@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import logging
 import re
 from cf2tf.terraform.code import SearchManager
-from cf2tf.terraform.hcl2 import Variable, Resource, Block, Output
+from cf2tf.terraform.hcl2 import Locals, Variable, Resource, Block, Output
 import cf2tf.conversion.expressions
 from cf2tf import cloudformation as cf
 from cf2tf.terraform import doc_file
@@ -22,6 +22,8 @@ def parse_template(cf_template: CFDict, search_manager: SearchManager) -> List[B
     blocks += parse_resources(cf_template, search_manager)
 
     blocks += parse_outputs(cf_template)
+
+    blocks += parse_mappings(cf_template)
 
     return blocks
 
@@ -198,6 +200,19 @@ def create_tf_output(cf_name, cf_props):
     log.debug("")
 
     return Output(tf_name, converted_args)
+
+
+def parse_mappings(cf_template: CFDict):
+
+    if "Mappings" not in cf_template:
+        log.debug("Did not parse any Mappings from Cloudformation template.")
+        return []
+
+    cf_mappings = cf_template["Mappings"]
+
+    local_block = Locals(cf_mappings)
+
+    return [local_block]
 
 
 def find_section(tf_attribute_name: str, docs_path: Path):
