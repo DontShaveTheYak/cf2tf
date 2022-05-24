@@ -15,16 +15,24 @@ log = logging.getLogger("cf2tf")
 
 def parse_template(cf_template: CFDict, search_manager: SearchManager) -> List[Block]:
 
-    vars = parse_vars(cf_template["Parameters"])
+    blocks: List[Block] = []
 
-    resources = parse_resources(cf_template["Resources"], search_manager)
+    blocks += parse_vars(cf_template)
 
-    outputs = parse_outputs(cf_template["Outputs"])
+    blocks += parse_resources(cf_template, search_manager)
 
-    return vars + resources + outputs
+    blocks += parse_outputs(cf_template)
+
+    return blocks
 
 
-def parse_vars(cf_params: CFDict):
+def parse_vars(cf_template: CFDict):
+
+    if "Parameters" not in cf_template:
+        log.debug("Did not parse any Parameters from Cloudformation template.")
+        return []
+
+    cf_params = cf_template["Parameters"]
 
     return [create_tf_var(var_name, values) for var_name, values in cf_params.items()]
 
@@ -49,8 +57,15 @@ def create_tf_var(cf_name, cf_props):
     return Variable(tf_name, converted_arguments)
 
 
-def parse_resources(cf_resources: CFDict, search_manager: SearchManager):
+def parse_resources(cf_template: CFDict, search_manager: SearchManager):
 
+    if "Resources" not in cf_template:
+        log.debug("Did not parse any Resources from Cloudformation template.")
+        return []
+
+    cf_resources = cf_template["Resources"]
+
+    # todo The call to get_cf_resources could be refactored out
     resources = get_cf_resources(cf_resources)
 
     return [get_tf_resource(resource, search_manager) for resource in resources]
@@ -155,7 +170,13 @@ def props_to_args(
     return converted_attrs
 
 
-def parse_outputs(cf_outputs: CFDict):
+def parse_outputs(cf_template: CFDict):
+
+    if "Outputs" not in cf_template:
+        log.debug("Did not parse any Outputs from Cloudformation template.")
+        return []
+
+    cf_outputs = cf_template["Outputs"]
 
     return [create_tf_output(name, values) for name, values in cf_outputs.items()]
 
