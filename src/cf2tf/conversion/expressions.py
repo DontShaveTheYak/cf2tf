@@ -345,7 +345,7 @@ def get_att(template: "Template", values: Any) -> str:
         KeyError: If the logicalNameOfResource is not found in the template.
 
     Returns:
-        str: The interpolated str `logicalNameOfResource.attributeName`.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -369,7 +369,7 @@ def get_att(template: "Template", values: Any) -> str:
             "Fn::GetAtt - logicalNameOfResource and attributeName must be String."
         )
 
-    resource = template.block_lookup(cf_name)
+    resource = template.block_lookup(cf_name, block_type=hcl2.Resource)
 
     if not resource:
         raise KeyError(f"Fn::GetAtt - Resource {cf_name} not found in template.")
@@ -394,14 +394,14 @@ def nested_attr(resource: hcl2.Resource, cf_prop: str, tf_attr: str):
     if resource.type == "aws_cloudformation_stack" and tf_attr == "outputs":
         return get_attr_nested_stack(resource, cf_prop, tf_attr)
 
-    raise Exception(f"Unable to solve nested GetAttr {cf_prop}")
+    raise ValueError(f"Unable to solve nested GetAttr {cf_prop}")
 
 
 def get_attr_nested_stack(resource: hcl2.Resource, cf_property, tf_attr):
     items = cf_property.split(".")
 
     if len(items) > 2:
-        raise Exception(f"Error parsing nested stack output for {cf_property}")
+        raise ValueError(f"Error parsing nested stack output for {cf_property}")
 
     _, stack_output_name = items
 

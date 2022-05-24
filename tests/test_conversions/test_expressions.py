@@ -16,6 +16,115 @@ def test_find_in_map():
     pass
 
 
+def test_get_att(fake_t: Configuration):
+
+    # Test that it will only take a list
+    with pytest.raises(TypeError) as e:
+        expressions.get_att(fake_t, {})
+
+    assert "Fn::GetAtt - The values must be a List, not dict." in str(e)
+
+    # Test that list size must be two
+    with pytest.raises(ValueError) as e:
+        expressions.get_att(fake_t, [0])
+
+    assert "values must contain the" in str(e)
+
+    # Test that items must be of type String
+    with pytest.raises(TypeError) as e:
+        expressions.get_att(fake_t, [0, 0])
+
+    assert "must be String." in str(e)
+
+    # Test with resource not in the configuration
+    resource_name = "fake_resource"
+    with pytest.raises(KeyError) as e:
+        expressions.get_att(fake_t, [resource_name, "name"])
+
+    assert f"{resource_name} not found in template." in str(e)
+
+    # We will create a resource for testing
+    test_resource = hcl2.Resource(
+        "test_stack",
+        "aws_cloudformation_stack",
+        {"name": "John Doe", "age": 30},
+        ["name", "age"],
+        ["name", "age", "outputs"],
+    )
+
+    fake_t.resources.append(test_resource)
+
+    fake_attr = "weight"
+
+    # Test with a fake attribute
+    with pytest.raises(ValueError) as e:
+        expressions.get_att(fake_t, [test_resource.name, fake_attr])
+
+    assert f"Could not convert Cloudformation property {fake_attr}" in str(e)
+
+    # Test with a normal attribute
+    test_attr = "age"
+    expected_result = f"{test_resource.type}.{test_resource.name}.{test_attr}"
+    result = expressions.get_att(fake_t, [test_resource.name, test_attr])
+
+    assert result == expected_result
+
+
+def test_get_att_nested(fake_t: Configuration):
+    """Test that nested cloudformation attributes work."""
+
+    # This resource type is fake to invoke an error
+    fake_resource = hcl2.Resource(
+        "fake_stack",
+        "aws_cloudformation_stack_fake",
+        {"name": "John Doe", "age": 30},
+        ["name", "age"],
+        ["name", "age", "outputs"],
+    )
+
+    fake_t.resources.append(fake_resource)
+
+    test_attr = "outputs.something"
+
+    # Test that the fake resource does not work
+    with pytest.raises(ValueError) as e:
+        expressions.get_att(
+            fake_t,
+            [fake_resource.name, test_attr],
+        )
+
+    assert f"Unable to solve nested GetAttr {test_attr}" in str(e)
+
+    # Add valid resource for testing
+    test_resource = hcl2.Resource(
+        "test_stack",
+        "aws_cloudformation_stack",
+        {"name": "John Doe", "age": 30},
+        ["name", "age"],
+        ["name", "age", "outputs"],
+    )
+
+    fake_t.resources.append(test_resource)
+
+    # Test attribute nested too far
+    nested_attr = f"{test_attr}.toofar"
+    with pytest.raises(ValueError) as e:
+        expressions.get_att(
+            fake_t,
+            [test_resource.name, nested_attr],
+        )
+
+    assert f"Error parsing nested stack output for {nested_attr}" in str(e)
+
+    # Test normal result
+
+    expected_result = f"{test_resource.type}.{test_resource.name}.{test_attr}"
+
+    result = expressions.get_att(fake_t, [test_resource.name, test_attr])
+
+    assert result == expected_result
+
+
 def test_get_azs(fake_t: Configuration):
 
     # Lets test that only valid Cloudformation functions work correctly.
