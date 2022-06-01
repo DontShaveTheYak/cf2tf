@@ -37,7 +37,7 @@ class Configuration:
         for resource in self.resources:
 
             # These dont have anything to resolve
-            if isinstance(resource, (Variable, Data, Locals)):
+            if isinstance(resource, (Variable, Data)):
                 continue
 
             self.resolve_values(resource.arguments, functions.ALL_FUNCTIONS)

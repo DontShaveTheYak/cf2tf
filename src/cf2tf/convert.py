@@ -25,6 +25,8 @@ def parse_template(cf_template: CFDict, search_manager: SearchManager) -> List[B
 
     blocks += parse_mappings(cf_template)
 
+    blocks += parse_conditions(cf_template, blocks)
+
     return blocks
 
 
@@ -211,6 +213,26 @@ def parse_mappings(cf_template: CFDict):
     cf_mappings = cf_template["Mappings"]
 
     local_block = Locals(cf_mappings)
+
+    return [local_block]
+
+
+def parse_conditions(cf_template: CFDict, current_resources: List[Block]):
+
+    if "Conditions" not in cf_template:
+        log.debug("Did not parse any Conditions from Cloudformation template.")
+        return []
+
+    cf_conditions = cf_template["Conditions"]
+
+    local_blocks = [block for block in current_resources if isinstance(block, Locals)]
+
+    if local_blocks:
+        local_block = local_blocks[0]
+        local_block.arguments.update(cf_conditions)
+        return []
+
+    local_block = Locals(cf_conditions)
 
     return [local_block]
 

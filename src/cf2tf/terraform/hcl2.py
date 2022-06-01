@@ -77,7 +77,11 @@ class Locals(Block):
 
         for name, value in self.arguments.items():
 
-            code_block += self.convert_map(name, value) + "\n"
+            if isinstance(value, dict):
+                code_block += self.convert_map(name, value) + "\n"
+                continue
+
+            code_block += f"  {name} = {use_quotes(value)}" + "\n"
 
         code_block += "}\n"
 
@@ -179,7 +183,10 @@ def use_quotes(item: str):
             return str(item)
 
         return item
-        # raise Exception("Found weird map when writing values")
+
+    # todo The logic for converting data from python to terraform and quoting should be seperated
+    if isinstance(item, bool):
+        return str(item).lower()
 
     # Basically if the item references a variable then no quotes
 

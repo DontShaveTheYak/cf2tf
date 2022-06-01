@@ -190,12 +190,7 @@ def if_(template: "Template", values: Any) -> Any:
             f"Fn::If - The Condition should be a String, not {type(condition).__name__}."
         )
 
-    condition = template.template["Conditions"][condition]
-
-    if condition:
-        return values[1]
-
-    return values[2]
+    return f"local.{condition} ? {values[1]} : {values[2]}"
 
 
 def not_(_t: "Template", values: Any) -> bool:
@@ -221,9 +216,10 @@ def not_(_t: "Template", values: Any) -> bool:
     if not len(values) == 1:
         raise ValueError("Fn::Not - The values must contain a single Condition.")
 
-    condition: bool = values[0]
+    condition: Any = values[0]
 
-    return not condition
+    # todo This needs fixed because python True needs to be terraform true
+    return f"!{condition}"
 
 
 def or_(_t: "Template", values: Any) -> bool:
@@ -257,34 +253,33 @@ def or_(_t: "Template", values: Any) -> bool:
     return f"anytrue({values})"
 
 
-# I'm not sure the following was even a real thing :blush:
+def condition(template: "Template", name: Any) -> str:
+    """Solves AWS Condition function.
 
-# def condition(template: "Template", name: Any) -> bool:
-#     """Solves AWS Condition function.
+    Args:
+        template (Template): The template being tested.
+        name (Any): The name of the condition.
 
-#     Args:
-#         template (Template): The template being tested.
-#         name (Any): The name of the condition.
+    Raises:
+        TypeError: If name is not a String.
+        KeyError: If name not found in template conditions.
 
-#     Raises:
-#         TypeError: If name is not a String.
-#         KeyError: If name not found in template conditions.
+    Returns:
+        bool: The value of the condition.
+    """
 
-#     Returns:
-#         bool: The value of the condition.
-#     """
+    if not isinstance(name, str):
+        raise TypeError(
+            f"Fn::Condition - The value must be a String, not {type(name).__name__}."
+        )
 
-#     if not isinstance(name, str):
-#         raise TypeError(
-#             f"Fn::Condition - The value must be a String, not {type(name).__name__}."
-#         )
+    # todo We could check if condition is a key in the local args
+    # if name not in template.template["Conditions"]:
+    #     raise KeyError(
+    #         f"Fn::Condition - Unable to find condition '{name}' in template."
+    #     )
 
-#     if name not in template.template["Conditions"]:
-#         raise KeyError(
-#             f"Fn::Condition - Unable to find condition '{name}' in template."
-#         )
-
-#     return template.template["Conditions"][name]
+    return f"local.{name}"
 
 
 def find_in_map(template: "Template", values: Any) -> Any:
@@ -828,6 +823,7 @@ CONDITIONS: Dispatch = {
     "Fn::If": if_,
     "Fn::Not": not_,
     "Fn::Or": or_,
+    "Fn::Condition": condition,
 }
 
 INTRINSICS: Dispatch = {
