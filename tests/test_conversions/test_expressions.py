@@ -13,6 +13,77 @@ def fake_t() -> Configuration:
     return Configuration(Path(), [])
 
 
+if_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    ([], None, pytest.raises(ValueError)),
+    ([True] * 4, None, pytest.raises(ValueError)),
+    ([True] * 3, None, pytest.raises(TypeError)),
+    (
+        ["something", "var.a", "var.b"],
+        "local.something ? var.a : var.b",
+        no_exception(),
+    ),
+    pytest.param(
+        ["something", "a", "b"],
+        'local.something ? "a" : "b"',
+        no_exception(),
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="Conversion from python datatypes to terraform argument values needed",
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", if_tests)
+def test_if(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.if_(fake_t, input)
+
+    assert result == expected_result
+
+
+not_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    ([], None, pytest.raises(ValueError)),
+    ([True] * 2, None, pytest.raises(ValueError)),
+    (["var.true"], "!var.true", no_exception()),
+    pytest.param(
+        [True],
+        "!true",
+        no_exception(),
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="Conversion from python datatypes to terraform argument values needed",
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", not_tests)
+def test_not(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.not_(fake_t, input)
+
+    assert result == expected_result
+
+
 # a tuple with a value for each parameter in the test function
 or_tests = [
     # (input, expected_result, expectation)
@@ -43,6 +114,28 @@ def test_or_(input, expected_result, expectation):
 
     with expectation:
         result = expressions.or_(fake_t, input)
+
+    assert result == expected_result
+
+
+condition_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    ("something", "local.something", no_exception()),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", condition_tests)
+def test_condition(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.condition(fake_t, input)
 
     assert result == expected_result
 
