@@ -22,6 +22,11 @@ Dispatch = Dict[str, Callable[..., Any]]
 
 REGION_DATA = None
 
+# todo Most of these exceptions are very similar
+# either we expect a certain type and didnt get it.
+# or we expect a certain length of list and didnt get it.
+# We should make an two or three exceptions to cover this
+
 
 def base64(_t: "Template", value: Any) -> str:
     """Solves AWS Base64 intrinsic function.
@@ -246,10 +251,13 @@ def or_(_t: "Template", values: Any) -> bool:
     if len_ < 2 or len_ > 10:
         raise ValueError("Fn::Not - The values must have between 2 and 10 conditions.")
 
-    return any(values)
+    # todo This isnt really correct. We need a way to convert a python
+    # data object into a valid terraform argument value, which includes proper quoting
+    # and maybe even indentation
+    return f"anytrue({values})"
 
 
-## I'm not sure the following was even a real thing :blush:
+# I'm not sure the following was even a real thing :blush:
 
 # def condition(template: "Template", name: Any) -> bool:
 #     """Solves AWS Condition function.
@@ -820,7 +828,6 @@ CONDITIONS: Dispatch = {
     "Fn::If": if_,
     "Fn::Not": not_,
     "Fn::Or": or_,
-    "Fn::Condition": condition,
 }
 
 INTRINSICS: Dispatch = {

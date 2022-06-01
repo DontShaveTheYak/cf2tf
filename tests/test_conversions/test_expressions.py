@@ -3,6 +3,7 @@ from cf2tf.terraform import Configuration
 from pathlib import Path
 
 import pytest
+from contextlib import nullcontext as no_exception
 
 import cf2tf.terraform.hcl2 as hcl2
 
@@ -10,6 +11,40 @@ import cf2tf.terraform.hcl2 as hcl2
 @pytest.fixture(scope="session")
 def fake_t() -> Configuration:
     return Configuration(Path(), [])
+
+
+# a tuple with a value for each parameter in the test function
+or_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    ([True], None, pytest.raises(ValueError)),
+    ([True] * 11, None, pytest.raises(ValueError)),
+    ([0, 1], "anytrue([0, 1])", no_exception()),
+    pytest.param(
+        [0, "one", True, "var.test"],
+        'anytrue([0, "one", true, var.test])',
+        no_exception(),
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="Conversion from python datatypes to terraform argument values needed",
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", or_tests)
+def test_or_(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.or_(fake_t, input)
+
+    assert result == expected_result
 
 
 def test_find_in_map(fake_t: Configuration):
