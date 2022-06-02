@@ -479,17 +479,32 @@ def test_join(fake_c, expression, expected):
     assert result == expected
 
 
-def test_ref():
-    """A reference in cloudformation is a direct reference to a variable."""
+ref_tests = [
+    # (input, expected_result, expectation, block)
+    ({}, None, pytest.raises(TypeError), None),
+    ("bazz", None, pytest.raises(ValueError), None),
+    ("foo", "var.foo", no_exception(), hcl2.Variable("foo", {"value": "bar"})),
+    (
+        "foo",
+        "foo.bar.bazz",
+        no_exception(),
+        hcl2.Resource("bar", "foo", {}, [], ["bazz"]),
+    ),
+]
 
-    var = hcl2.Variable("foo", {"value": "bar"})
-    resources = [var]
 
-    tf_config = Configuration(Path(), resources)
+@pytest.mark.parametrize("input, expected_result, expectation, block", ref_tests)
+def test_ref(input, expected_result, expectation, block):
 
-    expected_value = f"var.{var.name}"
+    tf_config = Configuration(Path(), [block])
 
-    assert expected_value == expressions.ref(tf_config, var.name)
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.ref(tf_config, input)
+
+    assert result == expected_result
 
 
 def test_select(fake_c):
