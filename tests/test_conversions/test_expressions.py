@@ -13,6 +13,143 @@ def fake_t() -> Configuration:
     return Configuration(Path(), [])
 
 
+base64_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    (
+        "var.something",
+        "base64encode(var.something)",
+        no_exception(),
+    ),
+    pytest.param(
+        "something",
+        'base64encode("something")',
+        no_exception(),
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="Conversion from python datatypes to terraform argument values needed",
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", base64_tests)
+def test_base64(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.base64(fake_t, input)
+
+    assert result == expected_result
+
+
+cidr_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    ([True], None, pytest.raises(ValueError)),
+    ([True] * 4, None, pytest.raises(ValueError)),
+    (
+        ["10.1.0.0/16", "4", "12"],
+        'cidrsubnets("10.1.0.0/16", 4, 4, 4, 4)',
+        no_exception(),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", cidr_tests)
+def test_cidr(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.cidr(fake_t, input)
+
+    assert result == expected_result
+
+
+and_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    ([True], None, pytest.raises(ValueError)),
+    ([True] * 11, None, pytest.raises(ValueError)),
+    (
+        [0, 1],
+        "alltrue([0, 1])",
+        no_exception(),
+    ),
+    pytest.param(
+        ["var.a", "true"],
+        'alltrue([var.a, "true"])',
+        no_exception(),
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="Conversion from python datatypes to terraform argument values needed",
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", and_tests)
+def test_and(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.and_(fake_t, input)
+
+    assert result == expected_result
+
+
+equals_tests = [
+    # (input, expected_result, expectation)
+    ({}, None, pytest.raises(TypeError)),
+    ([True], None, pytest.raises(ValueError)),
+    ([True] * 3, None, pytest.raises(ValueError)),
+    (
+        ["var.a", "var.b"],
+        "var.a == var.b",
+        no_exception(),
+    ),
+    pytest.param(
+        ["var.a", "something"],
+        'var.a == "something"',
+        no_exception(),
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="Conversion from python datatypes to terraform argument values needed",
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation", equals_tests)
+def test_equals(input, expected_result, expectation):
+
+    # fake template that is not used
+    fake_t: Configuration = None
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.equals(fake_t, input)
+
+    assert result == expected_result
+
+
 if_tests = [
     # (input, expected_result, expectation)
     ({}, None, pytest.raises(TypeError)),

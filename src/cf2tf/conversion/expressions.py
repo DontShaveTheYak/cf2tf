@@ -47,9 +47,7 @@ def base64(_t: "Template", value: Any) -> str:
             f"Fn::Base64 - The value must be a String, not {type(value).__name__}."
         )
 
-    b_string = b64.b64encode(value.encode("ascii"))
-
-    return b_string.decode("ascii")
+    return f"base64encode({value})"
 
 
 def cidr(_t: "Template", values: Any) -> List[str]:
@@ -87,19 +85,14 @@ def cidr(_t: "Template", values: Any) -> List[str]:
 
     mask = 32 - hostBits
 
-    network = ipaddress.IPv4Network(ip_block, strict=True)
+    _, netmask = ip_block.split("/")
 
-    subnets = network.subnets(new_prefix=mask)
+    newbits = mask - int(netmask)
 
-    try:
-        return [next(subnets).exploded for _ in range(count)]
-    except Exception:
-        raise Exception(
-            f"!Cidr or Fn::Cidr unable to convert {ip_block} into {count} subnets of /{mask}"
-        )
+    return f'cidrsubnets("{ip_block}", {", ".join([str(newbits)] * count)})'
 
 
-def and_(_t: "Template", values: Any) -> bool:
+def and_(_t: "Template", values: Any) -> str:
     """Solves AWS And intrinsic function.
 
     Args:
@@ -124,10 +117,10 @@ def and_(_t: "Template", values: Any) -> bool:
     if len_ < 2 or len_ > 10:
         raise ValueError("Fn::And - The values must have between 2 and 10 conditions.")
 
-    return all(values)
+    return f"alltrue({values})"
 
 
-def equals(_t: "Template", values: Any) -> bool:
+def equals(_t: "Template", values: Any) -> str:
     """Solves AWS Equals intrinsic function.
 
     Args:
@@ -150,7 +143,7 @@ def equals(_t: "Template", values: Any) -> bool:
     if not len(values) == 2:
         raise ValueError("Fn::Equals - The values must contain two values to compare.")
 
-    return values[0] == values[1]
+    return f"{values[0]} == {values[1]}"
 
 
 def if_(template: "Template", values: Any) -> Any:
