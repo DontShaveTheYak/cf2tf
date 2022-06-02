@@ -3,24 +3,17 @@
 This module contains the logic to convert an AWS intrinsic function/conditional to
 it's Terraform equivalent.
 """
-
-import base64 as b64
-import ipaddress
-import json
 import re
 from typing import Any, Callable, Dict, List, TYPE_CHECKING, Union
 
-import requests
 
 import cf2tf.convert
 import cf2tf.terraform.hcl2 as hcl2
 
 if TYPE_CHECKING:
-    from cf2tf.terraform import Configuration as Template
+    from cf2tf.terraform import Configuration
 
 Dispatch = Dict[str, Callable[..., Any]]
-
-REGION_DATA = None
 
 # todo Most of these exceptions are very similar
 # either we expect a certain type and didnt get it.
@@ -28,18 +21,18 @@ REGION_DATA = None
 # We should make an two or three exceptions to cover this
 
 
-def base64(_t: "Template", value: Any) -> str:
-    """Solves AWS Base64 intrinsic function.
+def base64(_c: "Configuration", value: Any):
+    """Converts Cloudformation Fn::Base64 intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
-        value (Any): The value to encode.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If value is not a String.
 
     Returns:
-        str: The value as a Base64 encoded String.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(value, str):
@@ -50,20 +43,19 @@ def base64(_t: "Template", value: Any) -> str:
     return f"base64encode({value})"
 
 
-def cidr(_t: "Template", values: Any) -> List[str]:
-    """Solves AWS Cidr intrinsic function.
+def cidr(_c: "Configuration", values: Any):
+    """Converts Cloudformation Fn::Cidr intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
-        values (Any): The values passed to the function.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If values is not a List.
         ValueError: If length of values is not 3.
-        Exception: If unable to convert network address to desired subnets.
 
     Returns:
-        List[str]: The subnets with network address and mask.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -92,19 +84,19 @@ def cidr(_t: "Template", values: Any) -> List[str]:
     return f'cidrsubnets("{ip_block}", {", ".join([str(newbits)] * count)})'
 
 
-def and_(_t: "Template", values: Any) -> str:
-    """Solves AWS And intrinsic function.
+def and_(_c: "Configuration", values: Any):
+    """Converts Cloudformation Fn::And intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
-        values (Any): The values passed to the function.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If values is not a List.
         ValueError: If length of values is not between 2 and 10.
 
     Returns:
-        bool: True if all values are True.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -120,19 +112,19 @@ def and_(_t: "Template", values: Any) -> str:
     return f"alltrue({values})"
 
 
-def equals(_t: "Template", values: Any) -> str:
-    """Solves AWS Equals intrinsic function.
+def equals(_c: "Configuration", values: Any):
+    """Converts Cloudformation Fn::Equals intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
-        values (Any): The values passed to the function.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If values is not a list.
         ValueError: If length of values is not 2.
 
     Returns:
-        bool: True if the values are equal.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -146,12 +138,12 @@ def equals(_t: "Template", values: Any) -> str:
     return f"{values[0]} == {values[1]}"
 
 
-def if_(template: "Template", values: Any) -> Any:
-    """Solves AWS If intrinsic function.
+def if_(_c: "Configuration", values: Any):
+    """Converts Cloudformation Fn::If intrinsic function to it's Terraform equivalent.
 
     Args:
-        template (Template): The template being tested.
-        values (Any): The values passed to the function.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If values is not a list.
@@ -159,7 +151,7 @@ def if_(template: "Template", values: Any) -> Any:
         TypeError: If the first value in the values is not str.
 
     Returns:
-        Any: The first value if True, otherwise second value.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -186,19 +178,19 @@ def if_(template: "Template", values: Any) -> Any:
     return f"local.{condition} ? {values[1]} : {values[2]}"
 
 
-def not_(_t: "Template", values: Any) -> bool:
-    """Solves AWS Not intrinsic function.
+def not_(_c: "Configuration", values: Any):
+    """Converts Cloudformation Fn::Not intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
-        values (Any): The values passed to the function.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If values is not a list.
         ValueError: If length of values is not 1.
 
     Returns:
-        bool: The opposite of values.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -215,19 +207,19 @@ def not_(_t: "Template", values: Any) -> bool:
     return f"!{condition}"
 
 
-def or_(_t: "Template", values: Any) -> bool:
-    """Solves AWS Or intrinsic function.
+def or_(_c: "Configuration", values: Any):
+    """Converts Cloudformation Fn::Or intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
-        values (Any): The values passed to the function.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If values is not a list.
         ValueError: If length of values is not between 2 and 10.
 
     Returns:
-        bool: True if any value in the values is True.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -246,19 +238,18 @@ def or_(_t: "Template", values: Any) -> bool:
     return f"anytrue({values})"
 
 
-def condition(template: "Template", name: Any) -> str:
-    """Solves AWS Condition function.
+def condition(configuration: "Configuration", name: Any):
+    """Converts Cloudformation Fn::Condition intrinsic function to it's Terraform equivalent.
 
     Args:
-        template (Template): The template being tested.
-        name (Any): The name of the condition.
+        _c (Configuration): The Terraform configuration.
+        value (Any): The value passed to the intrinsic function.
 
     Raises:
         TypeError: If name is not a String.
-        KeyError: If name not found in template conditions.
 
     Returns:
-        bool: The value of the condition.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(name, str):
@@ -275,11 +266,11 @@ def condition(template: "Template", name: Any) -> str:
     return f"local.{name}"
 
 
-def find_in_map(template: "Template", values: Any) -> Any:
+def find_in_map(configuration: "Configuration", values: Any):
     """Converts AWS FindInMap intrinsic function to it's Terraform equivalent.
 
     Args:
-        template (Template): The template being tested.
+        configuration (Configuration): The configuration being tested.
         values (Any): The values passed to the function.
 
     Raises:
@@ -309,7 +300,7 @@ def find_in_map(template: "Template", values: Any) -> Any:
     second_key = values[2]
 
     # First we need to make sure that locals is a block present in the Terraform configuration.
-    blocks = template.blocks_by_type(hcl2.Locals)
+    blocks = configuration.blocks_by_type(hcl2.Locals)
 
     if not blocks:
         raise ValueError("Unable to find a locals block in the configuration.")
@@ -339,18 +330,18 @@ def find_in_map(template: "Template", values: Any) -> Any:
     return f'local.{map_name}["{top_key}"]["{second_key}"]'
 
 
-def get_att(template: "Template", values: Any) -> str:
+def get_att(configuration: "Configuration", values: Any):
     """Converts AWS GetAtt intrinsic function to it's Terraform equivalent.
 
     Args:
-        template (Template): The template being tested.
+        configuration (Configuration): The configuration being tested.
         values (Any): The values passed to the function.
 
     Raises:
         TypeError: If values is not a list.
         ValueError: If length of values is not 3.
         TypeError: If the logicalNameOfResource and attributeName are not str.
-        KeyError: If the logicalNameOfResource is not found in the template.
+        KeyError: If the logicalNameOfResource is not found in the configuration.
 
     Returns:
         str: Terraform equivalent expression.
@@ -377,10 +368,10 @@ def get_att(template: "Template", values: Any) -> str:
             "Fn::GetAtt - logicalNameOfResource and attributeName must be String."
         )
 
-    resource = template.block_lookup(cf_name, block_type=hcl2.Resource)
+    resource = configuration.block_lookup(cf_name, block_type=hcl2.Resource)
 
     if not resource:
-        raise KeyError(f"Fn::GetAtt - Resource {cf_name} not found in template.")
+        raise KeyError(f"Fn::GetAtt - Resource {cf_name} not found in configuration.")
 
     result = cf2tf.convert.matcher(cf_property, resource.valid_attributes, 50)
 
@@ -416,11 +407,11 @@ def get_attr_nested_stack(resource: hcl2.Resource, cf_property, tf_attr):
     return f"{resource.type}.{resource.name}.{tf_attr}.{stack_output_name}"
 
 
-def get_azs(template: "Template", region: Any) -> str:
+def get_azs(configuration: "Configuration", region: Any):
     """Converts AWS GetAZs intrinsic function to it's Terraform equivalent.
 
     Args:
-        template (Template): The Terraform Configuration.
+        configuration (Configuration): The Terraform Configuration.
         region (Any): The name of a region.
 
     Raises:
@@ -438,28 +429,30 @@ def get_azs(template: "Template", region: Any) -> str:
             f"Fn::GetAZs - The region must be a String, not {type(region).__name__}."
         )
 
-    if not template.block_lookup("availability_zones", hcl2.Data):
+    if not configuration.block_lookup("availability_zones", hcl2.Data):
         az_data = hcl2.Data("available", "availability_zones", {"state": "available"})
-        template.resources.insert(0, az_data)
+        configuration.resources.insert(0, az_data)
 
     return "data.aws_availability_zones.available.names"
 
 
 # todo Handle functions that are not applicable to terraform.
-def import_value(template: "Template", name: Any) -> str:
+def import_value(configuration: "Configuration", name: Any):
     # I'm not sure how to handle this but I think if any exception is encountered while
     # converting cf expressions to terraform, we should just comment out the entire line.
+
+    # On second thought it probably makes sense to turn this into a input variable
 
     raise Exception(
         "Fn::Import Is Cloudformation native and unable to be converted to a Terraform expression."
     )
 
 
-def join(_t: "Template", values: Any) -> str:
+def join(_c: "Configuration", values: Any):
     """Converts AWS Join intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
+        _t (Configuration): Not used.
         values (Any): The values passed to the function.
 
     Raises:
@@ -508,11 +501,11 @@ def _terraform_list(items: List[Any]):
     return f"[{', '.join(items)}]"
 
 
-def select(_t: "Template", values: Any) -> Any:
+def select(_c: "Configuration", values: Any):
     """Converts AWS Select intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
+        _t (Configuration): Not used.
         values (Any): The values passed to the function.
 
     Raises:
@@ -522,7 +515,7 @@ def select(_t: "Template", values: Any) -> Any:
         IndexError: If the List size is smaller than the index.
 
     Returns:
-        Any: Terraform equivalent expression.
+        str: Terraform equivalent expression.
     """
 
     if not isinstance(values, list):
@@ -556,11 +549,11 @@ def select(_t: "Template", values: Any) -> Any:
         raise IndexError("Fn::Select - List size is smaller than the Index given.")
 
 
-def split(_t: "Template", values: Any) -> List[str]:
+def split(_c: "Configuration", values: Any):
     """Converts AWS Split intrinsic function to it's Terraform equivalent.
 
     Args:
-        _t (Template): Not used.
+        _t (Configuration): Not used.
         values (Any): The values passed to the function.
 
     Raises:
@@ -599,11 +592,11 @@ def split(_t: "Template", values: Any) -> List[str]:
     return f'split("{delimiter}", "{source_string}")'
 
 
-def sub(template: "Template", values: Any) -> str:
+def sub(configuration: "Configuration", values: Any):
     """Converts AWS Sub intrinsic function to it's Terraform equivalent.
 
     Args:
-        template (Template): The cf template being converted.
+        configuration (Configuration): The cf configuration being converted.
         values (Any): The values passed to the function.
 
     Raises:
@@ -614,21 +607,21 @@ def sub(template: "Template", values: Any) -> str:
     """
 
     if isinstance(values, str):
-        return sub_s(template, values)
+        return sub_s(configuration, values)
 
     if isinstance(values, list):
-        return sub_l(template, values)
+        return sub_l(configuration, values)
 
     raise TypeError(
         f"Fn::Sub - The input must be a String or List, not {type(values).__name__}."
     )
 
 
-def sub_s(template: "Template", value: str) -> str:
+def sub_s(configuration: "Configuration", value: str):
     """Converts AWS Sub intrinsic function String version to it's Terraform equivalent.
 
     Args:
-        template (Template): The template being tested.
+        configuration (Configuration): The configuration being tested.
         value (str): The String containing variables.
 
     Returns:
@@ -638,7 +631,7 @@ def sub_s(template: "Template", value: str) -> str:
     def replace_var(m):
         var = m.group(2)
 
-        result = ref(template, var)
+        result = ref(configuration, var)
         return wrap_in_curlys(result)
 
     reVar = r"(?!\$\{\!)\$(\w+|\{([^}]*)\})"
@@ -649,12 +642,12 @@ def sub_s(template: "Template", value: str) -> str:
     return value.replace("${!", "${")
 
 
-# todo This needs to create local variables in the template.
-def sub_l(template: "Template", values: List) -> str:
+# todo This needs to create local variables in the configuration.
+def sub_l(configuration: "Configuration", values: List):
     """Converts AWS Sub intrinsic function List version to it's Terraform equivalent.
 
     Args:
-        template (Template): The template being tested.
+        configuration (Configuration): The configuration being tested.
         values (List): The List containing input string and var Map.
 
     Raises:
@@ -691,7 +684,7 @@ def sub_l(template: "Template", values: List) -> str:
             result = local_vars[var]
             return wrap_in_curlys(result)
 
-        result = ref(template, var)
+        result = ref(configuration, var)
 
         return wrap_in_curlys(result)
 
@@ -704,7 +697,7 @@ def sub_l(template: "Template", values: List) -> str:
 
 
 # todo Transform is an AWS native capability with no Terraform equivalent expression.
-def transform(_t: "Template", values: Any) -> str:
+def transform(_c: "Configuration", values: Any):
     # I'm not sure how to handle this but I think if any exception is encountered while
     # converting cf expressions to terraform, we should just comment out the entire line.
 
@@ -713,18 +706,18 @@ def transform(_t: "Template", values: Any) -> str:
     )
 
 
-def ref(template: "Template", var_name: str) -> Any:
+def ref(configuration: "Configuration", var_name: str):
     """Converts AWS Ref intrinsic function to it's Terraform equivalent.
 
     Args:
-        template (Template): The template being converted.
+        configuration (Configuration): The configuration being converted.
         var_name (str): The name of the parameter, resource or pseudo variable.
 
     Raises:
         ValueError: If the supplied variable doesn't exist.
 
     Returns:
-        Any: Terraform equivalent expression.
+        str: Terraform equivalent expression.
     """
 
     # var_name = pascal_to_snake(var_name)
@@ -737,17 +730,17 @@ def ref(template: "Template", var_name: str) -> Any:
         if pseudo == "Region":
 
             # todo This is a bug, multiple blocks can have the same name as long as they have different block types
-            if not template.block_lookup("current", block_type=hcl2.Data):
+            if not configuration.block_lookup("current", block_type=hcl2.Data):
                 region_data = hcl2.Data("current", "region", {})
-                template.resources.insert(0, region_data)
+                configuration.resources.insert(0, region_data)
 
             return "data.aws_region.current.name"
         try:
-            return getattr(template, pseudo)
+            return getattr(configuration, pseudo)
         except AttributeError:
             raise ValueError(f"Unrecognized AWS Pseduo variable: '{var_name}'.")
 
-    item = template.block_lookup(var_name, block_type=hcl2.Block)
+    item = configuration.block_lookup(var_name, block_type=hcl2.Block)
 
     if not item:
         raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
@@ -762,54 +755,13 @@ def ref(template: "Template", var_name: str) -> Any:
     raise ValueError(f"Unable to solve Reference for {var_name}")
 
 
-def wrap_in_curlys(input: str) -> str:
+def wrap_in_curlys(input: str):
     """Wrap the input in ${} to make a terraform variable."""
 
     return f"${{{input}}}"
 
 
-def get_region_azs(region_name: str) -> List[str]:
-    """Retries AZs from REGION_DATA.
-
-    Args:
-        region_name (str): The name of the AWS region.
-
-    Raises:
-        Exception: If unable to find data for provided region name.
-
-    Returns:
-        List[str]: List of AZs for provided region name.
-    """
-
-    global REGION_DATA
-
-    if not REGION_DATA:
-        REGION_DATA = _fetch_region_data()
-
-    for region in REGION_DATA:
-        if region["code"] == region_name:
-            return region["zones"]
-
-    raise Exception(f"Unable to find region {region_name}.")
-
-
-def _fetch_region_data() -> List[dict]:
-    """Fetchs Region JSON from URL.
-
-    Returns:
-        List[dict]: Region data.
-    """
-
-    url = "https://raw.githubusercontent.com/jsonmaur/aws-regions/master/regions.json"
-
-    r = requests.get(url)
-
-    if not r.status_code == requests.codes.ok:
-        r.raise_for_status()
-
-    return json.loads(r.text)
-
-
+# These are all the json keys for condition functions
 CONDITIONS: Dispatch = {
     "Fn::And": and_,
     "Fn::Equals": equals,
@@ -819,6 +771,7 @@ CONDITIONS: Dispatch = {
     "Fn::Condition": condition,
 }
 
+# These are all the json keys for intrinsic functions
 INTRINSICS: Dispatch = {
     "Fn::If": if_,  # Conditional function but is allowed here
     "Fn::Base64": base64,
@@ -835,17 +788,23 @@ INTRINSICS: Dispatch = {
     "Ref": ref,
 }
 
+# This is a map of all cloudformation functions
 ALL_FUNCTIONS: Dispatch = {
     **CONDITIONS,
     **INTRINSICS,
 }
 
+
+# These are the functions allowed to be called inside other condition functions
 ALLOWED_NESTED_CONDITIONS: Dispatch = {
     "Fn::FindInMap": find_in_map,
     "Ref": ref,
     **CONDITIONS,
 }
 
+# Cloudformation only allows certain functions to be called from inside
+# other functions. The keys are the function name and the values are the
+# functions that are allowed to be nested inside it.
 ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
     "Fn::And": ALLOWED_NESTED_CONDITIONS,
     "Fn::Equals": ALLOWED_NESTED_CONDITIONS,
