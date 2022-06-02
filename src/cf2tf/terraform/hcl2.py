@@ -42,7 +42,7 @@ class Block:
             if isinstance(value, dict):
                 code_block = code_block + "\n\n" + create_subsection(name, value)
                 continue
-            code_block = code_block + f"  {name} = {use_quotes(value)}\n"
+            code_block = code_block + f"  {name} = {value}\n"
 
         code_block += "}\n"
 
@@ -57,11 +57,11 @@ class Variable(Block):
         super().__init__("variable", [self.name], arguments, valid_arguments, [])
 
     def write(self):
-        text = super().write()
 
-        var_type = self.arguments["type"]
+        # Type will be quoted, so we have to unquote it.
+        self.arguments["type"] = self.arguments["type"].strip('"')
 
-        return text.replace(f'"{var_type}"', var_type)
+        return super().write()
 
 
 class Locals(Block):
@@ -81,7 +81,7 @@ class Locals(Block):
                 code_block += self.convert_map(name, value) + "\n"
                 continue
 
-            code_block += f"  {name} = {use_quotes(value)}" + "\n"
+            code_block += f"  {name} = {value}" + "\n"
 
         code_block += "}\n"
 
@@ -98,9 +98,7 @@ class Locals(Block):
             if isinstance(value, dict):
                 code_block += f"\n{self.convert_map(name, value, indent_level + 1)}"
                 continue
-            code_block = (
-                code_block + f"\n{indent}  {use_quotes(name)} = {use_quotes(value)}"
-            )
+            code_block = code_block + f"\n{indent}  {name} = {value}"
 
         return code_block + f"\n{indent}}}"
 
@@ -168,53 +166,6 @@ def create_subsection(name: str, values: Dict[str, Any], indent_level: int = 1):
     code_block = f"{indent}{name} {{"
 
     for name, value in values.items():
-        code_block = code_block + f"\n{indent}  {name} = {use_quotes(value)}"
+        code_block = code_block + f"\n{indent}  {name} = {value}"
 
     return code_block + f"\n{indent}}}\n"
-
-
-def use_quotes(item: str):
-
-    if isinstance(item, dict):
-        log.error(f"Found a map when writing a terraform attribute value {item}")
-        value: str = next(iter(item))
-
-        if "Fn::" in value or "Ref" in value:
-            return str(item)
-
-        return item
-
-    # todo The logic for converting data from python to terraform and quoting should be seperated
-    if isinstance(item, bool):
-        return str(item).lower()
-
-    # Basically if the item references a variable then no quotes
-
-    # Handle this in the future
-    if isinstance(item, list):
-        return item
-
-    if item.startswith("aws_"):
-        return item
-
-    if item.startswith("var."):
-        return item
-
-    if is_function(item):
-        return item
-
-    return f'"{item}"'
-
-
-def is_function(item: str):
-    regex = r"([a-z]+)\(.*\)"
-
-    matches = re.search(regex, item)
-
-    if matches:
-        match = matches.group(1)
-
-        if match in ["join"]:
-            return True
-
-    return False

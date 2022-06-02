@@ -34,21 +34,18 @@ class Configuration:
 
     def resolve_objects(self):
 
-        for resource in self.resources:
+        # Cant loop over the actual list because we are adding items to it
+        # which creates some pretty crazy bugs
+        for block in self.resources.copy():
+
+            # log.debug(f"{index} {block.labels}")
 
             # These dont have anything to resolve
-            if isinstance(resource, (Variable, Data)):
+            if isinstance(block, Data):
                 continue
 
-            self.resolve_values(resource.arguments, functions.ALL_FUNCTIONS)
-
-    # def resolve_arguments(self, arguments: Dict[str, Any]):
-
-    #     for arg_name in list(arguments):
-
-    #         arg_value = arguments[arg_name]
-
-    #         if self.contains_functions(arg_value)
+            log.debug(f"\n### Resolving values for {block.labels}")
+            self.resolve_values(block.arguments, functions.ALL_FUNCTIONS)
 
     def resolve_values(self, data: Any, allowed_func: functions.Dispatch) -> Any:
         """Recurses through a Cloudformation template. Solving all
@@ -87,7 +84,13 @@ class Configuration:
         elif isinstance(data, list):
             return [self.resolve_values(item, allowed_func) for item in data]
         else:
-            return data
+
+            # This weirdess handles an empty string like "",
+            # with out it, it becomes """" when printed()
+            if not data:
+                return data
+
+            return f'"{data}"'
 
     def contains_functions(self, data: Dict[str, Any]):
 

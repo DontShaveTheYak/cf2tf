@@ -5,7 +5,9 @@ it's Terraform equivalent.
 """
 import re
 from typing import Any, Callable, Dict, List, TYPE_CHECKING, Union
+import logging
 
+log = logging.getLogger("cf2tf")
 
 import cf2tf.convert
 import cf2tf.terraform.hcl2 as hcl2
@@ -40,6 +42,7 @@ def base64(_c: "Configuration", value: Any):
             f"Fn::Base64 - The value must be a String, not {type(value).__name__}."
         )
 
+    value = value.strip('"')
     return f"base64encode({value})"
 
 
@@ -71,7 +74,7 @@ def cidr(_c: "Configuration", values: Any):
             )
         )
 
-    ip_block: str = values[0]
+    ip_block: str = values[0].strip('"')
     count = int(values[1])
     hostBits = int(values[2])
 
@@ -175,6 +178,8 @@ def if_(_c: "Configuration", values: Any):
             f"Fn::If - The Condition should be a String, not {type(condition).__name__}."
         )
 
+    condition = condition.strip('"')
+
     return f"local.{condition} ? {values[1]} : {values[2]}"
 
 
@@ -257,6 +262,7 @@ def condition(configuration: "Configuration", name: Any):
             f"Fn::Condition - The value must be a String, not {type(name).__name__}."
         )
 
+    name = name.strip('"')
     # todo We could check if condition is a key in the local args
     # if name not in template.template["Conditions"]:
     #     raise KeyError(
@@ -368,6 +374,9 @@ def get_att(configuration: "Configuration", values: Any):
             "Fn::GetAtt - logicalNameOfResource and attributeName must be String."
         )
 
+    cf_name = cf_name.strip('"')
+    cf_property = cf_property.strip('"')
+
     resource = configuration.block_lookup(cf_name, block_type=hcl2.Resource)
 
     if not resource:
@@ -429,6 +438,8 @@ def get_azs(configuration: "Configuration", region: Any):
             f"Fn::GetAZs - The region must be a String, not {type(region).__name__}."
         )
 
+    region = region.strip('"')
+
     if not configuration.block_lookup("availability_zones", hcl2.Data):
         az_data = hcl2.Data("available", "availability_zones", {"state": "available"})
         configuration.resources.insert(0, az_data)
@@ -481,7 +492,7 @@ def join(_c: "Configuration", values: Any):
     items: Union[List[Any], str]
 
     if isinstance(values[0], str) and isinstance(values[1], (list, str)):
-        delimiter = values[0]
+        delimiter = values[0].strip('"')
         items = values[1]
     else:
         raise TypeError(
@@ -494,9 +505,10 @@ def join(_c: "Configuration", values: Any):
     return f'join("{delimiter}", {_terraform_list(items)})'
 
 
+# todo I'm not sure this is that useful
 def _terraform_list(items: List[Any]):
 
-    items = [hcl2.use_quotes(item) for item in items]
+    items = [item for item in items]
 
     return f"[{', '.join(items)}]"
 
@@ -542,8 +554,12 @@ def select(_c: "Configuration", values: Any):
             "Fn::Select - The first value must be a Number and the second a List or String."
         )
 
+    if isinstance(items, str):
+        items = items.strip('"')
+    else:
+        items = _terraform_list(items)
+
     try:
-        items = str(items).replace("'", '"')
         return f"element({items}, {index})"
     except IndexError:
         raise IndexError("Fn::Select - List size is smaller than the Index given.")
@@ -582,7 +598,7 @@ def split(_c: "Configuration", values: Any):
     source_string: str
 
     if isinstance(values[0], str) and isinstance(values[1], str):
-        delimiter = values[0]
+        delimiter = values[0].strip('"')
         source_string = values[1]
     else:
         raise TypeError(

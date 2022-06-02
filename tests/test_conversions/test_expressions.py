@@ -461,12 +461,12 @@ def test_get_azs(fake_c: Configuration):
 
 join_tests = [
     (None, ["-", "var.something"], 'join("-", var.something)'),
-    (None, ["-", ["A", "B", "C"]], 'join("-", ["A", "B", "C"])'),
-    (None, ["-", ["A", "var.thing", "C"]], 'join("-", ["A", var.thing, "C"])'),
+    (None, ["-", ["A", "B", "C"]], 'join("-", [A, B, C])'),
+    (None, ["-", ["A", "var.thing", "C"]], 'join("-", [A, var.thing, C])'),
     (
         None,
         ["-", ["A", "aws_resource.name.attr", "C"]],
-        'join("-", ["A", aws_resource.name.attr, "C"])',
+        'join("-", [A, aws_resource.name.attr, C])',
     ),
 ]
 
@@ -485,7 +485,7 @@ ref_tests = [
     ("bazz", None, pytest.raises(ValueError), None),
     ("foo", "var.foo", no_exception(), hcl2.Variable("foo", {"value": "bar"})),
     (
-        "foo",
+        "bar",
         "foo.bar.bazz",
         no_exception(),
         hcl2.Resource("bar", "foo", {}, [], ["bazz"]),
@@ -517,7 +517,7 @@ def test_select(fake_c):
 
     assert result == expected
 
-    cf_expression = [0, ["A", "B", "C"]]
+    cf_expression = [0, ['"A"', '"B"', '"C"']]
 
     expected = 'element(["A", "B", "C"], 0)'
 
@@ -537,19 +537,108 @@ def test_split(fake_c):
     assert result == expected
 
 
-def test_sub():
-    """A Sub in cf is a string that contains references to variables, resources or AWS pseudo parameters."""
+sub_tests = [
+    # (input, expected_result, expectation, block)
+    (
+        {},
+        None,
+        pytest.raises(TypeError),
+        None,
+    ),
+]
 
-    var = hcl2.Variable("foo", {"value": "bar"})
-    resources = [var]
 
-    tf_config = Configuration(Path(), resources)
+@pytest.mark.parametrize("input, expected_result, expectation, block", sub_tests)
+def test_sub(input, expected_result, expectation, block):
 
-    expected_value = f"test ${{var.{var.name}}} string"
+    tf_config = Configuration(Path(), [block])
 
-    test_string = f"test ${{{var.name}}} string"
+    # This is needed for tests that raise an exception
+    result = expected_result
 
-    assert expected_value == expressions.sub_s(tf_config, test_string)
+    with expectation:
+        result = expressions.sub_s(tf_config, input)
+
+    print(result)
+
+    assert result == expected_result
+
+
+sub_s_tests = [
+    # (input, expected_result, expectation, block)
+    (
+        "some ${foo}",
+        "some ${var.foo}",
+        no_exception(),
+        hcl2.Variable("foo", {"value": "bar"}),
+    ),
+    (
+        "some ${bar}",
+        "some ${foo.bar.bazz}",
+        no_exception(),
+        hcl2.Resource("bar", "foo", {}, [], ["bazz"]),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation, block", sub_s_tests)
+def test_sub_s(input, expected_result, expectation, block):
+
+    tf_config = Configuration(Path(), [block])
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.sub_s(tf_config, input)
+
+    print(result)
+
+    assert result == expected_result
+
+
+sub_l_tests = [
+    # (input, expected_result, expectation, block)
+    ([None], None, pytest.raises(ValueError), None),
+    ([None] * 3, None, pytest.raises(ValueError), None),
+    ([None, None], None, pytest.raises(TypeError), None),
+    (
+        ["some ${foo} ${bar}", {"bar": "foo.bar.bazz"}],
+        "some ${var.foo} ${foo.bar.bazz}",
+        no_exception(),
+        hcl2.Variable("foo", {"value": "bar"}),
+    ),
+    (
+        ["some ${foo} ${bar}", {"bar": "var.foo"}],
+        "some ${var.foo} ${var.foo}",
+        no_exception(),
+        hcl2.Variable("foo", {"value": "bar"}),
+    ),
+    pytest.param(
+        ["some ${foo} ${bar}", {"bar": "some string"}],
+        "some ${var.foo} some string",
+        no_exception(),
+        hcl2.Variable("foo", {"value": "bar"}),
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="Strings are valid but shouldnt be used.",
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected_result, expectation, block", sub_l_tests)
+def test_sub_l(input, expected_result, expectation, block):
+
+    tf_config = Configuration(Path(), [block])
+
+    # This is needed for tests that raise an exception
+    result = expected_result
+
+    with expectation:
+        result = expressions.sub_l(tf_config, input)
+
+    assert result == expected_result
 
 
 def test_transform(fake_c):
