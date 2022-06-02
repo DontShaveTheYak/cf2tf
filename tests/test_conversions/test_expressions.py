@@ -9,7 +9,7 @@ import cf2tf.terraform.hcl2 as hcl2
 
 
 @pytest.fixture(scope="session")
-def fake_t() -> Configuration:
+def fake_c() -> Configuration:
     return Configuration(Path(), [])
 
 
@@ -37,13 +37,13 @@ base64_tests = [
 def test_base64(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.base64(fake_t, input)
+        result = expressions.base64(fake_c, input)
 
     assert result == expected_result
 
@@ -65,13 +65,13 @@ cidr_tests = [
 def test_cidr(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.cidr(fake_t, input)
+        result = expressions.cidr(fake_c, input)
 
     assert result == expected_result
 
@@ -102,13 +102,13 @@ and_tests = [
 def test_and(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.and_(fake_t, input)
+        result = expressions.and_(fake_c, input)
 
     assert result == expected_result
 
@@ -139,13 +139,13 @@ equals_tests = [
 def test_equals(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.equals(fake_t, input)
+        result = expressions.equals(fake_c, input)
 
     assert result == expected_result
 
@@ -177,13 +177,13 @@ if_tests = [
 def test_if(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.if_(fake_t, input)
+        result = expressions.if_(fake_c, input)
 
     assert result == expected_result
 
@@ -210,13 +210,13 @@ not_tests = [
 def test_not(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.not_(fake_t, input)
+        result = expressions.not_(fake_c, input)
 
     assert result == expected_result
 
@@ -244,13 +244,13 @@ or_tests = [
 def test_or_(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.or_(fake_t, input)
+        result = expressions.or_(fake_c, input)
 
     assert result == expected_result
 
@@ -266,29 +266,29 @@ condition_tests = [
 def test_condition(input, expected_result, expectation):
 
     # fake template that is not used
-    fake_t: Configuration = None
+    fake_c: Configuration = None
 
     # This is needed for tests that raise an exception
     result = expected_result
 
     with expectation:
-        result = expressions.condition(fake_t, input)
+        result = expressions.condition(fake_c, input)
 
     assert result == expected_result
 
 
-def test_find_in_map(fake_t: Configuration):
+def test_find_in_map(fake_c: Configuration):
 
     # Test that it will only take a list
     with pytest.raises(TypeError) as e:
-        expressions.find_in_map(fake_t, {})
+        expressions.find_in_map(fake_c, {})
 
     assert "Fn::FindInMap - The values must be a List, not dict." in str(e)
 
     # Test that it must contain three items
 
     with pytest.raises(ValueError) as e:
-        expressions.find_in_map(fake_t, [""])
+        expressions.find_in_map(fake_c, [""])
 
     assert "MapName, TopLevelKey and SecondLevelKey." in str(e)
 
@@ -297,7 +297,7 @@ def test_find_in_map(fake_t: Configuration):
     second_level_key = "HVM64"
 
     with pytest.raises(ValueError) as e:
-        expressions.find_in_map(fake_t, ["a", "b", "c"])
+        expressions.find_in_map(fake_c, ["a", "b", "c"])
 
     assert "Unable to find a locals block" in str(e)
 
@@ -305,61 +305,61 @@ def test_find_in_map(fake_t: Configuration):
 
     locals_block = hcl2.Locals(test_args)
 
-    fake_t.resources.append(locals_block)
+    fake_c.resources.append(locals_block)
 
     # Test for map name
     with pytest.raises(KeyError) as e:
-        expressions.find_in_map(fake_t, ["fakeMap", top_level_key, second_level_key])
+        expressions.find_in_map(fake_c, ["fakeMap", top_level_key, second_level_key])
 
     assert "Unable to find fakeMap" in str(e)
 
     # Test for top level key
     with pytest.raises(KeyError) as e:
-        expressions.find_in_map(fake_t, [map_name, "fake_top", second_level_key])
+        expressions.find_in_map(fake_c, [map_name, "fake_cop", second_level_key])
 
-    assert "Unable to find key fake_top" in str(e)
+    assert "Unable to find key fake_cop" in str(e)
 
     # test for second level key
     with pytest.raises(KeyError) as e:
-        expressions.find_in_map(fake_t, [map_name, top_level_key, "fake_second"])
+        expressions.find_in_map(fake_c, [map_name, top_level_key, "fake_second"])
 
     assert "Unable to find key fake_second" in str(e)
 
     expected_result = f'local.{map_name}["{top_level_key}"]["{second_level_key}"]'
 
     result = expressions.find_in_map(
-        fake_t, [map_name, top_level_key, second_level_key]
+        fake_c, [map_name, top_level_key, second_level_key]
     )
 
     assert result == expected_result
 
 
-def test_get_att(fake_t: Configuration):
+def test_get_att(fake_c: Configuration):
 
     # Test that it will only take a list
     with pytest.raises(TypeError) as e:
-        expressions.get_att(fake_t, {})
+        expressions.get_att(fake_c, {})
 
     assert "Fn::GetAtt - The values must be a List, not dict." in str(e)
 
     # Test that list size must be two
     with pytest.raises(ValueError) as e:
-        expressions.get_att(fake_t, [0])
+        expressions.get_att(fake_c, [0])
 
     assert "values must contain the" in str(e)
 
     # Test that items must be of type String
     with pytest.raises(TypeError) as e:
-        expressions.get_att(fake_t, [0, 0])
+        expressions.get_att(fake_c, [0, 0])
 
     assert "must be String." in str(e)
 
     # Test with resource not in the configuration
     resource_name = "fake_resource"
     with pytest.raises(KeyError) as e:
-        expressions.get_att(fake_t, [resource_name, "name"])
+        expressions.get_att(fake_c, [resource_name, "name"])
 
-    assert f"{resource_name} not found in template." in str(e)
+    assert f"{resource_name} not found in configuration." in str(e)
 
     # We will create a resource for testing
     test_resource = hcl2.Resource(
@@ -370,25 +370,25 @@ def test_get_att(fake_t: Configuration):
         ["name", "age", "outputs"],
     )
 
-    fake_t.resources.append(test_resource)
+    fake_c.resources.append(test_resource)
 
     fake_attr = "weight"
 
     # Test with a fake attribute
     with pytest.raises(ValueError) as e:
-        expressions.get_att(fake_t, [test_resource.name, fake_attr])
+        expressions.get_att(fake_c, [test_resource.name, fake_attr])
 
     assert f"Could not convert Cloudformation property {fake_attr}" in str(e)
 
     # Test with a normal attribute
     test_attr = "age"
     expected_result = f"{test_resource.type}.{test_resource.name}.{test_attr}"
-    result = expressions.get_att(fake_t, [test_resource.name, test_attr])
+    result = expressions.get_att(fake_c, [test_resource.name, test_attr])
 
     assert result == expected_result
 
 
-def test_get_att_nested(fake_t: Configuration):
+def test_get_att_nested(fake_c: Configuration):
     """Test that nested cloudformation attributes work."""
 
     # This resource type is fake to invoke an error
@@ -400,14 +400,14 @@ def test_get_att_nested(fake_t: Configuration):
         ["name", "age", "outputs"],
     )
 
-    fake_t.resources.append(fake_resource)
+    fake_c.resources.append(fake_resource)
 
     test_attr = "outputs.something"
 
     # Test that the fake resource does not work
     with pytest.raises(ValueError) as e:
         expressions.get_att(
-            fake_t,
+            fake_c,
             [fake_resource.name, test_attr],
         )
 
@@ -422,13 +422,13 @@ def test_get_att_nested(fake_t: Configuration):
         ["name", "age", "outputs"],
     )
 
-    fake_t.resources.append(test_resource)
+    fake_c.resources.append(test_resource)
 
     # Test attribute nested too far
     nested_attr = f"{test_attr}.toofar"
     with pytest.raises(ValueError) as e:
         expressions.get_att(
-            fake_t,
+            fake_c,
             [test_resource.name, nested_attr],
         )
 
@@ -438,25 +438,25 @@ def test_get_att_nested(fake_t: Configuration):
 
     expected_result = f"{test_resource.type}.{test_resource.name}.{test_attr}"
 
-    result = expressions.get_att(fake_t, [test_resource.name, test_attr])
+    result = expressions.get_att(fake_c, [test_resource.name, test_attr])
 
     assert result == expected_result
 
 
-def test_get_azs(fake_t: Configuration):
+def test_get_azs(fake_c: Configuration):
 
     # Lets test that only valid Cloudformation functions work correctly.
     with pytest.raises(TypeError):
         not_valid_region = []
-        _ = expressions.get_azs(fake_t, not_valid_region)
+        _ = expressions.get_azs(fake_c, not_valid_region)
 
     # test that the return value is correct
     expected = "data.aws_availability_zones.available.names"
-    result = expressions.get_azs(fake_t, "Testing")
+    result = expressions.get_azs(fake_c, "Testing")
     assert result == expected
 
     # Make sure the datasource was added correctly
-    assert fake_t.block_lookup("available", block_type=hcl2.Data)
+    assert fake_c.block_lookup("available", block_type=hcl2.Data)
 
 
 join_tests = [
@@ -471,10 +471,10 @@ join_tests = [
 ]
 
 
-@pytest.mark.parametrize("fake_t, expression, expected", join_tests)
-def test_join(fake_t, expression, expected):
+@pytest.mark.parametrize("fake_c, expression, expected", join_tests)
+def test_join(fake_c, expression, expected):
 
-    result = expressions.join(fake_t, expression)
+    result = expressions.join(fake_c, expression)
 
     assert result == expected
 
@@ -492,13 +492,13 @@ def test_ref():
     assert expected_value == expressions.ref(tf_config, var.name)
 
 
-def test_select(fake_t):
+def test_select(fake_c):
 
     cf_expression = [0, "var.something"]
 
     expected = "element(var.something, 0)"
 
-    result = expressions.select(fake_t, cf_expression)
+    result = expressions.select(fake_c, cf_expression)
 
     assert result == expected
 
@@ -506,18 +506,18 @@ def test_select(fake_t):
 
     expected = 'element(["A", "B", "C"], 0)'
 
-    result = expressions.select(fake_t, cf_expression)
+    result = expressions.select(fake_c, cf_expression)
 
     assert result == expected
 
 
-def test_split(fake_t):
+def test_split(fake_c):
 
     cf_expression = [",", "A,B,C"]
 
     expected = 'split(",", "A,B,C")'
 
-    result = expressions.split(fake_t, cf_expression)
+    result = expressions.split(fake_c, cf_expression)
 
     assert result == expected
 
@@ -537,7 +537,7 @@ def test_sub():
     assert expected_value == expressions.sub_s(tf_config, test_string)
 
 
-def test_transform(fake_t):
+def test_transform(fake_c):
 
     with pytest.raises(Exception):
-        _ = expressions.transform(fake_t, "Any Value")
+        _ = expressions.transform(fake_c, "Any Value")
