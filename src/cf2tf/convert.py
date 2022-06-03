@@ -126,11 +126,6 @@ def props_to_args(
 
     for prop_name, prop_value in cf_props.items():
 
-        if prop_name in cf2tf.conversion.expressions.ALL_FUNCTIONS:
-            log.debug(f"Skipping Cloudformation function {prop_name}.")
-            converted_attrs[prop_name] = prop_value
-            continue
-
         search_term = camel_case_split(prop_name)
 
         log.debug(f"Searching for {search_term} instead of {prop_name}")
@@ -153,6 +148,15 @@ def props_to_args(
         # that tf_attribute_name is a nested block in terraform
 
         if isinstance(prop_value, dict):
+
+            possible_func = next(iter(prop_value))
+
+            if possible_func in cf2tf.conversion.expressions.ALL_FUNCTIONS:
+
+                log.debug(f"Skipping Cloudformation function {possible_func}.")
+                converted_attrs[tf_arg_name] = prop_value
+                continue
+
             section_name = find_section(tf_arg_name, docs_path)
 
             if not section_name:
