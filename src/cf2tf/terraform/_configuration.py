@@ -8,6 +8,8 @@ from cf2tf.terraform.hcl2 import Block, Locals, Variable, Output, Data
 import cf2tf.convert
 import logging
 
+from cf2tf.save import Output
+
 log = logging.getLogger("cf2tf")
 
 
@@ -16,29 +18,19 @@ class Configuration:
         self.resources = resources
         self.output_path = output_path
 
-    def save(self):
+    def save(self, output: Output):
 
         # We should probably handle the actual saving of resources here
 
         self.resolve_objects()
 
-        for resource in self.resources:
-            try:
-                print()
-                print(resource.write())
-            except Exception as e:
-                log.error(
-                    f"Unable to write {resource.name} {resource.type} {resource.attributes}"
-                )
-                raise e
+        output.save(self.resources)
 
     def resolve_objects(self):
 
         # Cant loop over the actual list because we are adding items to it
         # which creates some pretty crazy bugs
         for block in self.resources.copy():
-
-            # log.debug(f"{index} {block.labels}")
 
             # These dont have anything to resolve
             if isinstance(block, Data):
@@ -92,17 +84,6 @@ class Configuration:
 
             return f'"{data}"'
 
-    def contains_functions(self, data: Dict[str, Any]):
-
-        functions = ["Ref", "Fn::"]
-
-        for key in list(data):
-
-            if key in functions:
-                return True
-
-        return False
-
     def block_lookup(self, name: str, block_type: Type[Block]) -> Optional[Block]:
 
         name = cf2tf.convert.pascal_to_snake(name)
@@ -114,14 +95,3 @@ class Configuration:
 
     def blocks_by_type(self, block_type: Type[Block]):
         return [block for block in self.resources if isinstance(block, block_type)]
-
-
-# def resource_lookup(config: "Configuration", name: str):
-
-#     for resource in config.resources:
-
-#         if hasattr(resource, "cf_resource") and resource.cf_resource.logical_id == name:
-#             return resource
-#         else:
-#             if resource.name == name:
-#                 return resource
