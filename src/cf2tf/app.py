@@ -1,14 +1,13 @@
-import click
-from pathlib import Path
-from cf2tf.terraform import code, Configuration
-from cf2tf.cloudformation import Template
-from cf2tf.convert import parse_template
-import cf2tf.save
-
 import logging
+from pathlib import Path
+
+import click
 import click_log
 
-from cf2tf.terraform.hcl2 import Output
+import cf2tf.save
+from cf2tf.cloudformation import Template
+from cf2tf.convert import TemplateConverter
+from cf2tf.terraform import code
 
 log = logging.getLogger("cf2tf")
 click_log.basic_config(log)
@@ -31,19 +30,16 @@ def cli(output, template_path: str):
     # Where/how we will write the results
     output_writer = cf2tf.save.Directory(output) if output else cf2tf.save.StdOut()
 
-    log.info(f"Converting {tmpl_path.name} to Terraform!")
-    log.debug(f"Template location is {tmpl_path}")
+    log.info(f"// Converting {tmpl_path.name} to Terraform!")
+    log.debug(f"// Template location is {tmpl_path}")
 
     cf_template = Template.from_yaml(tmpl_path).template
 
     # Need to get the code from the repo
     search_manger = code.search_manager()
 
-    # Turn cloudformation resources into unrendered terraform resources
-    parsed_blocks = parse_template(cf_template, search_manger)
-
-    # Create a terraform configuration
-    config = Configuration("./", parsed_blocks)
+    # Turn Cloudformation template into a Terraform configuration
+    config = TemplateConverter(cf_template, search_manger).convert()
 
     # Save this configuration to disc
     config.save(output_writer)

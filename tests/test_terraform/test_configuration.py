@@ -1,37 +1,29 @@
 import pytest
+from cf2tf.convert import TemplateConverter
+from cf2tf.terraform import code
 
-from cf2tf.terraform import Configuration
-from pathlib import Path
 
+def tc() -> TemplateConverter:
 
-@pytest.fixture(scope="session")
-def fake_c() -> Configuration:
-    return Configuration(Path(), [])
+    sm = code.search_manager()
+
+    tc = TemplateConverter({}, sm)
+
+    tc.manifest = {section: [] for section in tc.valid_sections}
+    return tc
 
 
 resolve_values_tests = [
-    # (input, expected_result, fake_c)
-    (
-        "A",
-        '"A"',
-        Configuration(Path(), []),
-    ),
-    (
-        ["A", "B", "C"],
-        ['"A"', '"B"', '"C"'],
-        Configuration(Path(), []),
-    ),
-    (
-        {"Foo": "Bar"},
-        {"Foo": '"Bar"'},
-        Configuration(Path(), []),
-    ),
+    # (input, expected_result, tc)
+    ("A", '"A"', tc()),
+    (["A", "B", "C"], ['"A"', '"B"', '"C"'], tc()),
+    ({"Foo": "Bar"}, {"Foo": '"Bar"'}, tc()),
 ]
 
 
-@pytest.mark.parametrize("input, expected_result, fake_c", resolve_values_tests)
-def test_resolve_values(input, expected_result, fake_c: Configuration):
+@pytest.mark.parametrize("input, expected_result, tc", resolve_values_tests)
+def test_resolve_values(input, expected_result, tc: TemplateConverter):
 
-    result = fake_c.resolve_values(input, {})
+    result = tc.resolve_values(input, {})
 
     assert result == expected_result

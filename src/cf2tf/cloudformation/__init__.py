@@ -1,1 +1,1 @@
-from ._template import Template, Resource
+from ._template import Template

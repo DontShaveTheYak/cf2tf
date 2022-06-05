@@ -1,14 +1,11 @@
 from __future__ import annotations
-from typing import Dict, Any, Union, Optional
-from cfn_tools import dump_yaml, load_yaml
-from pathlib import Path
-import yaml
+
 import logging
-import json
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
 
-# from cf2tf.conversion import expressions as functions
-
-# from . import functions
+import yaml
+from cfn_tools import dump_yaml, load_yaml
 
 log = logging.getLogger("cf2tf")
 
@@ -84,88 +81,3 @@ class Template:
         template = yaml.load(tmp_str, Loader=yaml.FullLoader)
 
         return cls(template, imports)
-
-    def render(
-        self, params: Dict[str, str] = None, region: Union[str, None] = None
-    ) -> dict:
-        """Solves all conditionals, references and pseudo variables using
-        the passed in parameters. After rendering the template all resources
-        that wouldn't get deployed because of a condtion statement are removed.
-
-        Args:
-            params (dict, optional): Parameter names and values to be used when rendering.
-            region (str, optional): The region is used for the AWS::Region pseudo variable. Defaults to "us-east-1".
-
-        Returns:
-            dict: The rendered template.
-        """  # noqa: B950
-
-        if region:
-            self.Region = region
-
-        self.template = yaml.load(self.raw, Loader=yaml.FullLoader)
-        # self.set_parameters(params)
-
-        # add_metadata(self.template, self.Region)
-
-        self.resolve_values(self.template, functions.ALL_FUNCTIONS)
-
-        return self.template
-
-    def resolve_values(self, data: Any, allowed_func: functions.Dispatch) -> Any:
-        """Recurses through a Cloudformation template. Solving all
-        references and variables along the way.
-
-        Args:
-            data (Any): Could be a dict, list, str or int.
-
-        Returns:
-            Any: Return the rendered data structure.
-        """
-
-        if isinstance(data, dict):
-
-            # for key, value in data.items():
-
-            for key in list(data):
-
-                value = data[key]
-
-                if key == "Ref":
-                    return functions.ref(self, value)
-
-                if "Fn::" not in key:
-                    data[key] = self.resolve_values(value, allowed_func)
-                    continue
-
-                if key not in allowed_func:
-                    raise ValueError(f"{key} not allowed here.")
-
-                value = self.resolve_values(value, functions.ALLOWED_FUNCTIONS[key])
-
-                return allowed_func[key](self, value)
-
-            return data
-        elif isinstance(data, list):
-            return [self.resolve_values(item, allowed_func) for item in data]
-        else:
-            return data
-
-
-class Resource:
-    def __init__(self, logical_id: str, fields: Dict[str, Any]) -> None:
-        self.logical_id = logical_id
-        self.type: str = fields.pop("Type")
-        self.properties = fields.pop("Properties")
-
-        if fields:
-            log.warn(f"{self.logical_id} had leftover fields: {fields}")
-
-    def __repr__(self) -> str:
-        return "REPR"
-
-    def __str__(self) -> str:
-        cf_representaion = {
-            self.logical_id: {"properties": self.properties, "type": self.type}
-        }
-        return json.dumps(cf_representaion, indent=4)

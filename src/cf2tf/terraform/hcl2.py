@@ -2,7 +2,6 @@
 
 
 from typing import Any, Dict, List
-import re
 
 import logging
 
@@ -68,39 +67,6 @@ class Locals(Block):
     def __init__(self, arguments: Dict[str, Any]) -> None:
         name = "locals"
         super().__init__(name, [], arguments, [], [])
-
-    def write(self):
-
-        code_block = ""
-
-        code_block += f"{self.block_type} {{\n"
-
-        for name, value in self.arguments.items():
-
-            if isinstance(value, dict):
-                code_block += self.convert_map(name, value) + "\n"
-                continue
-
-            code_block += f"  {name} = {value}" + "\n"
-
-        code_block += "}\n"
-
-        return code_block
-
-    def convert_map(self, name: str, values: Dict[str, Any], indent_level=1):
-
-        indent = "  " * indent_level
-
-        code_block = f"{indent}{name} = {{"
-
-        for name, value in values.items():
-
-            if isinstance(value, dict):
-                code_block += f"\n{self.convert_map(name, value, indent_level + 1)}"
-                continue
-            code_block = code_block + f"\n{indent}  {name} = {value}"
-
-        return code_block + f"\n{indent}}}"
 
 
 class Data(Block):

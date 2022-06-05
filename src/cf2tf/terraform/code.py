@@ -1,12 +1,10 @@
-from pathlib import Path
-from git.repo.base import Repo
-from git import RemoteProgress
 import logging
-
-from thefuzz import process, fuzz
+from pathlib import Path
 
 import click
-
+from git import RemoteProgress
+from git.repo.base import Repo
+from thefuzz import fuzz, process
 
 log = logging.getLogger("cf2tf")
 
@@ -21,7 +19,7 @@ class SearchManager:
 
         name = name.replace("::", " ").lower().replace("aws", "").strip()
 
-        # click.echo(f"Searcing for {name} in terraform docs...")
+        log.debug(f"Searcing for {name} in terraform docs...")
 
         files = {
             doc_file: doc_file.name.split(".")[0].replace("_", " ")
@@ -35,9 +33,9 @@ class SearchManager:
             name.lower(), files, scorer=fuzz.token_sort_ratio
         )
 
-        # click.echo(
-        #     f"Best match was {resource_name} at {doc_path} with score of {ranking}."
-        # )
+        log.debug(
+            f"Best match was {resource_name} at {doc_path} with score of {ranking}."
+        )
 
         return doc_path
 
@@ -59,15 +57,13 @@ def get_code():
 
     repo_path = Path("/tmp/terraform_src")
 
-    print(f"Cloning Terraform src code to {repo_path}...")
+    print(f"// Cloning Terraform src code to {repo_path}...", end="")
 
     if repo_path.joinpath(".git").exists():
         # Need to check to make sure the remote is correct
         click.echo(" existing repo found.")
         repo = Repo(repo_path)
         return repo
-
-    # print("cloning ....")
 
     repo = Repo.clone_from(
         "https://github.com/hashicorp/terraform-provider-aws.git",
