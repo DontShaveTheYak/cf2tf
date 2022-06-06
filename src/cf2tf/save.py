@@ -3,14 +3,19 @@
 import logging
 from itertools import groupby
 from pathlib import Path
-from typing import Iterable, List, Optional, Protocol, Type, runtime_checkable
+from typing import Iterable, List, Optional, Type
+
+try:
+    from typing import Protocol
+except ImportError:
+    # Python 3.6 and 3.7
+    from typing_extensions import Protocol  # type: ignore
 
 import cf2tf.terraform.hcl2 as hlc2
 
 log = logging.getLogger("cf2tf")
 
 
-@runtime_checkable
 class Output(Protocol):
     def save(self, resources: List[hlc2.Block]) -> None:
         """Save the results

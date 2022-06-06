@@ -44,7 +44,7 @@ def parse_section(name: str, file: TextIOWrapper):
 
 
 def parse_items(file: TextIOWrapper):
-    attributes: list[str] = []
+    attributes: List[str] = []
 
     while True:
 
