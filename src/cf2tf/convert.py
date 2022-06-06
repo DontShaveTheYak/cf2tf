@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from thefuzz import process
+from thefuzz import process  # type: ignore
 
 import cf2tf.conversion.expressions as functions
 import cf2tf.terraform._configuration as config
@@ -63,7 +63,7 @@ class TemplateConverter:
 
         return config.Configuration(tf_resources)
 
-    def parse_template(self) -> Manifest:
+    def parse_template(self):
 
         for section in self.valid_sections:
 
@@ -83,18 +83,18 @@ class TemplateConverter:
 
     def resource_lookup(
         self, resource_name: str, sections: List[str]
-    ) -> Optional[CFResource]:
+    ) -> Optional[Dict[str, Any]]:
 
         for section in sections:
-            # log.debug(f"Looking up {resource_name} in {section}")
 
             section_resources = self.manifest.get(section)
-            # log.debug(section_resources)
-            section_map = dict(section_resources)
-            # log.debug(section_map)
 
-            if resource_name in section_map:
-                return section_map[resource_name]
+            if section_resources:
+                section_map: Dict[str, Dict[str, Any]] = dict(section_resources)  # type: ignore
+
+                if resource_name in section_map:
+                    resource = section_map[resource_name]
+                    return resource
 
         return None
 
@@ -255,7 +255,12 @@ class TemplateConverter:
             tf_name = pascal_to_snake(resource_id)
             log.debug(f"Converted name to {tf_name}")
 
-            docs_path = self.search_manager.find(resource_props.get("Type"))
+            resource_type = resource_props.get("Type")
+
+            if not resource_type:
+                raise Exception("Type is required")
+
+            docs_path = self.search_manager.find(resource_type)
 
             log.debug(f"Found documentation file {docs_path}")
 
@@ -327,7 +332,7 @@ class TemplateConverter:
 def get_converter(
     item: Any,
     section_name: str,
-) -> Callable[[CFResources, CFResources], List[Block]]:
+) -> Callable[[CFResources], List[Block]]:
     conveter_name = f"convert_{section_name.lower()}"
 
     converter = getattr(item, conveter_name)

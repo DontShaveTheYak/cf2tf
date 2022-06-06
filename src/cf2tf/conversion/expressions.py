@@ -391,7 +391,12 @@ def get_att(template: "TemplateConverter", values: Any):
     if not cf_resource:
         raise KeyError(f"Fn::GetAtt - Resource {cf_name} not found in template.")
 
-    docs_path = template.search_manager.find(cf_resource.get("Type"))
+    resource_type = cf_resource.get("Type")
+
+    if not resource_type:
+        raise Exception("Type is required")
+
+    docs_path = template.search_manager.find(resource_type)
     valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
 
     result = cf2tf.convert.matcher(cf_property, valid_arguments + valid_attributes, 50)
@@ -568,7 +573,7 @@ def select(_tc: "TemplateConverter", values: Any):
         )
 
     index: int
-    items: List[Any]
+    items: Union[List[Any], str]
 
     if isinstance(values[0], int) and isinstance(values[1], (list, str)):
         index = values[0]
@@ -789,7 +794,8 @@ def ref(template: "TemplateConverter", var_name: str):
     cf_resource = template.resource_lookup(var_name, ["Resources"])
 
     if cf_resource:
-        docs_path = template.search_manager.find(cf_resource.get("Type"))
+        cf_resource_type = cf_resource.get("Type", "")
+        docs_path = template.search_manager.find(cf_resource_type)
         _, valid_attributes = doc_file.parse_attributes(docs_path)
         tf_name = cf2tf.convert.pascal_to_snake(var_name)
         tf_type = cf2tf.convert.create_resource_type(docs_path)

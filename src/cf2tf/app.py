@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 import click
 import click_log
@@ -17,7 +18,7 @@ click_log.basic_config(log)
 @click.option("--output", "-o", type=click.Path(exists=False))
 @click_log.simple_verbosity_option(log)
 @click.argument("template_path", type=click.Path(exists=True))
-def cli(output, template_path: str):
+def cli(output: Optional[str], template_path: str):
     """Convert Cloudformation template into Terraform.
 
     Args:
@@ -28,7 +29,7 @@ def cli(output, template_path: str):
     tmpl_path = Path(template_path)
 
     # Where/how we will write the results
-    output_writer = cf2tf.save.Directory(output) if output else cf2tf.save.StdOut()
+    output_writer = cf2tf.save.create_writer(output)
 
     log.info(f"// Converting {tmpl_path.name} to Terraform!")
     log.debug(f"// Template location is {tmpl_path}")

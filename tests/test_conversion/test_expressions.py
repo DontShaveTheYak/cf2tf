@@ -1,15 +1,11 @@
-from cf2tf.conversion import expressions
-
-# from cf2tf.terraform import config.Configuration
-import cf2tf.terraform._configuration as config
-import cf2tf.terraform.code as code
-from cf2tf.convert import TemplateConverter
-from pathlib import Path
-
-import pytest
 from contextlib import nullcontext as no_exception
+from typing import Any, List
 
+import cf2tf.terraform.code as code
 import cf2tf.terraform.hcl2 as hcl2
+import pytest
+from cf2tf.conversion import expressions
+from cf2tf.convert import TemplateConverter
 
 
 @pytest.fixture(scope="session")
@@ -290,26 +286,26 @@ def test_condition(input, expected_result, expectation):
 def test_find_in_map(fake_tc: TemplateConverter):
 
     # Test that it will only take a list
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError) as type_error:
         expressions.find_in_map(fake_tc, {})
 
-    assert "Fn::FindInMap - The values must be a List, not dict." in str(e)
+    assert "Fn::FindInMap - The values must be a List, not dict." in str(type_error)
 
     # Test that it must contain three items
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as value_error:
         expressions.find_in_map(fake_tc, [""])
 
-    assert "MapName, TopLevelKey and SecondLevelKey." in str(e)
+    assert "MapName, TopLevelKey and SecondLevelKey." in str(value_error)
 
     map_name = "RegionMap"
     top_level_key = "us-east-1"
     second_level_key = "HVM64"
 
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as value_error:
         expressions.find_in_map(fake_tc, ["a", "b", "c"])
 
-    assert "Unable to find a locals block" in str(e)
+    assert "Unable to find a locals block" in str(value_error)
 
     test_args = {map_name: {top_level_key: {second_level_key: "test value"}}}
 
@@ -318,10 +314,10 @@ def test_find_in_map(fake_tc: TemplateConverter):
     fake_tc.post_proccess_blocks.append(locals_block)
 
     # Test for map name
-    with pytest.raises(KeyError) as e:
+    with pytest.raises(KeyError) as key_error:
         expressions.find_in_map(fake_tc, ["fakeMap", top_level_key, second_level_key])
 
-    assert "Unable to find fakeMap" in str(e)
+    assert "Unable to find fakeMap" in str(key_error)
 
     # Test for top level key
     with pytest.raises(KeyError) as e:
@@ -347,29 +343,29 @@ def test_find_in_map(fake_tc: TemplateConverter):
 def test_get_att(fake_tc: TemplateConverter):
 
     # Test that it will only take a list
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError) as type_error:
         expressions.get_att(fake_tc, {})
 
-    assert "Fn::GetAtt - The values must be a List, not dict." in str(e)
+    assert "Fn::GetAtt - The values must be a List, not dict." in str(type_error)
 
     # Test that list size must be two
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as value_error:
         expressions.get_att(fake_tc, [0])
 
-    assert "values must contain the" in str(e)
+    assert "values must contain the" in str(value_error)
 
     # Test that items must be of type String
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(TypeError) as type_error:
         expressions.get_att(fake_tc, [0, 0])
 
-    assert "must be String." in str(e)
+    assert "must be String." in str(type_error)
 
     # Test with resource not in the template
     resource_name = "fake_resource"
-    with pytest.raises(KeyError) as e:
+    with pytest.raises(KeyError) as key_error:
         expressions.get_att(fake_tc, [resource_name, "name"])
 
-    assert f"{resource_name} not found in template." in str(e)
+    assert f"{resource_name} not found in template." in str(key_error)
 
     resource_id = "test_stack"
     resource_props = {"Type": "AWS::CloudFormation::Stack"}
@@ -379,10 +375,10 @@ def test_get_att(fake_tc: TemplateConverter):
     fake_attr = "weight"
 
     # Test with a fake attribute
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError) as value_error:
         expressions.get_att(fake_tc, ["test_stack", fake_attr])
 
-    assert f"Could not convert Cloudformation property {fake_attr}" in str(e)
+    assert f"Could not convert Cloudformation property {fake_attr}" in str(value_error)
 
     # Test with a normal attribute
     test_attr = "template_url"
@@ -448,7 +444,7 @@ def test_get_azs(fake_tc: TemplateConverter):
 
     # Lets test that only valid Cloudformation functions work correctly.
     with pytest.raises(TypeError):
-        not_valid_region = []
+        not_valid_region: List[Any] = []
         _ = expressions.get_azs(fake_tc, not_valid_region)
 
     # test that the return value is correct
@@ -549,7 +545,7 @@ def test_split(fake_tc):
     assert result == expected
 
 
-sub_tests = [
+sub_tests: Any = [
     # (input, expected_result, expectation, block)
     (
         {},

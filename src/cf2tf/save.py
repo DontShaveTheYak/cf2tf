@@ -1,19 +1,16 @@
 """Save the results of the conversion.
 """
-
-from pathlib import Path
-
+import logging
 from itertools import groupby
+from pathlib import Path
+from typing import Iterable, List, Optional, Protocol, Type, runtime_checkable
 
 import cf2tf.terraform.hcl2 as hlc2
-
-from typing import List, Protocol, Type
-
-import logging
 
 log = logging.getLogger("cf2tf")
 
 
+@runtime_checkable
 class Output(Protocol):
     def save(self, resources: List[hlc2.Block]) -> None:
         """Save the results
@@ -46,7 +43,7 @@ class Directory:
         for k, g in groupby(resources, lambda s: type(s)):
             self.write_group(k, g)
 
-    def write_group(self, block_type: Type[hlc2.Block], blocks: List[hlc2.Block]):
+    def write_group(self, block_type: Type[hlc2.Block], blocks: Iterable[hlc2.Block]):
         """Creates a file and writes the resources into it.
 
         Args:
@@ -79,7 +76,17 @@ class StdOut:
                 print()
                 print(resource.write())
             except Exception as e:
-                print(
-                    f"Unable to write {resource.name} {resource.type} {resource.attributes}"
-                )
+                print(f"Unable to write {'.'.join(resource.labels)}")
                 raise e
+
+
+def create_writer(output: Optional[str]) -> Output:
+
+    writer: Output
+
+    if output:
+        writer = Directory(output)
+    else:
+        writer = StdOut()
+
+    return writer

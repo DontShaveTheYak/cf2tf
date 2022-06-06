@@ -66,7 +66,12 @@ def parse_items(file: TextIOWrapper):
 
             regex = r"`([\w]+)`"
 
-            attribute = re.search(regex, line).group(1)
+            match = re.search(regex, line)
+
+            if not match:
+                raise Exception("Something bad happened.")
+
+            attribute = match.group(1)
 
             attributes.append(attribute)
 

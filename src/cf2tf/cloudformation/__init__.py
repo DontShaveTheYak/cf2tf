@@ -1,1 +1,1 @@
-from ._template import Template
+from ._template import Template  # noqa: F401

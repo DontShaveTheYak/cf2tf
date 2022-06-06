@@ -1,10 +1,13 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 import click
 from git import RemoteProgress
 from git.repo.base import Repo
-from thefuzz import fuzz, process
+from thefuzz import fuzz, process  # type: ignore
+
+from click._termui_impl import ProgressBar
 
 log = logging.getLogger("cf2tf")
 
@@ -79,14 +82,15 @@ def get_code():
 class CloneProgress(RemoteProgress):
     def __init__(self):
         super().__init__()
-        self.pbar = None
+        self.pbar: Optional[ProgressBar] = None
 
     def update(self, op_code, cur_count, max_count=None, message=""):
         if not self.pbar and max_count:
             self.create_pbar(int(max_count))
 
-        self.pbar.length = int(max_count)
-        self.pbar.update(1)
+        if self.pbar:
+            self.pbar.length = int(max_count)
+            self.pbar.update(1)
 
     def create_pbar(self, max_count):
         self.pbar = click.progressbar(length=max_count)
