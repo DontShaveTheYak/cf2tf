@@ -41,6 +41,13 @@ SHELL ["/bin/bash","--login", "-c"]
 ENV PYENV_ROOT="/home/vscode/.pyenv"
 ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
-RUN pyenv install 3.9.12 && pyenv global 3.9.12 && pyenv rehash
+RUN pyenv install -s 3.7.13 && \
+    pyenv install -s 3.8.13 && \
+    pyenv install -s 3.9.12 && \
+    pyenv install -s 3.10.4 && \
+    pyenv global 3.9.12 && \
+    pyenv rehash
 
 RUN curl -sSL https://install.python-poetry.org | python3 -
+
+RUN pip install --user --upgrade nox nox_poetry
