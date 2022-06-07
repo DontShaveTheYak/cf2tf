@@ -3,7 +3,10 @@ from typing import Any, Dict
 
 import cf2tf.convert as convert
 import pytest
-from cf2tf.terraform import doc_file
+from cf2tf.terraform import doc_file, code
+
+# todo We should not have to checkout the terraform source to run tests
+code.search_manager()
 
 props_to_args_tests = [
     # (props, expected_args, docs_path)
