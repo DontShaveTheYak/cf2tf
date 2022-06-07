@@ -3,6 +3,10 @@ from pathlib import Path
 from typing import List
 import re
 
+import logging
+
+log = logging.getLogger("cf2tf")
+
 
 def parse_attributes(docs_path: Path):
 
@@ -38,7 +42,7 @@ def parse_section(name: str, file: TextIOWrapper):
     items = parse_items(file)
 
     if not items:
-        print(f"Unable to find items in section {name} of {file.name}")
+        log.debug(f"Unable to find items in section {name} of {file.name}")
 
     return items
 
@@ -54,7 +58,7 @@ def parse_items(file: TextIOWrapper):
         line = file.readline()
 
         if not line:
-            print("We have ran out out attributes to parse")
+            log.debug("We have ran out out attributes to parse")
             break
 
         # If line starts with whitespace its probably a multiline description
@@ -64,12 +68,12 @@ def parse_items(file: TextIOWrapper):
         # These should be the attributes we are after
         if line[0] == "*":
 
-            regex = r"`([\w]+)`"
+            regex = r"`([\w\.]+)`"
 
             match = re.search(regex, line)
 
             if not match:
-                raise Exception("Something bad happened.")
+                raise Exception(f"Did not find an item to parse in {line}")
 
             attribute = match.group(1)
 
@@ -110,12 +114,10 @@ def find_section(name: str, file: TextIOWrapper):
 
         line = file.readline()
 
-        # print(line)
-
         if line.startswith("#") and name in line:
             return cur_pos + 1
 
         if not line:
-            print(f"Unable to find section {name} in {file.name}")
+            log.debug(f"Unable to find section {name} in {file.name}")
             raise Exception()
             return None
