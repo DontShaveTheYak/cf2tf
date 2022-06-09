@@ -32,7 +32,7 @@ jobs:
         run: pip install nox nox_poetry pre-commit
 
       - name: Run Pre-commit
-        run: pre-commit run -all-files
+        run: pre-commit run --all-files
 
       - name: Convert Coverage
         run: coverage xml --fail-under=0
