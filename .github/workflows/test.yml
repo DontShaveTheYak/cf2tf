@@ -32,7 +32,7 @@ jobs:
         run: pip install coverage[toml]
 
       - name: Setup Nox
-        run: pip install nox==2022.1.7
+        run: pip install nox nox_poetry
 
       - name: Run Pre-commit
         uses: pre-commit/action@v2.0.3
@@ -64,7 +64,7 @@ jobs:
           architecture: x64
 
       - name: Setup Nox
-        run: pip install nox==2022.1.7
+        run: pip install nox nox_poetry
 
       - name: Setup Poetry
         run: pip install poetry==1.1.13
