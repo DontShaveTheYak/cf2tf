@@ -28,14 +28,11 @@ jobs:
           pip install poetry==1.1.13
           poetry install
 
-      - name: Setup Coverage
-        run: pip install coverage[toml]
-
-      - name: Setup Nox
-        run: pip install nox nox_poetry
+      - name: Setup requirements
+        run: pip install nox nox_poetry pre-commit
 
       - name: Run Pre-commit
-        uses: pre-commit/action@v2.0.3
+        run: pre-commit run -all
 
       - name: Convert Coverage
         run: coverage xml --fail-under=0
