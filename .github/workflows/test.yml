@@ -1,0 +1,73 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+    paths-ignore:
+      - '.github/workflows/release.yml'
+      - '.github/workflows/pr_checks.yml'
+
+jobs:
+  pre_commit:
+    runs-on: ubuntu-latest
+    name: Pre-commit
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2.3.4
+
+      - name: Setup Latest Python
+        uses: actions/setup-python@v2.2.2
+        with:
+          python-version: 3.9
+          architecture: x64
+
+      - name: Setup Poetry
+        run: |
+          pip install poetry==1.1.13
+          poetry install
+
+      - name: Setup Coverage
+        run: pip install coverage[toml]
+
+      - name: Setup Nox
+        run: pip install nox==2022.1.7
+
+      - name: Run Pre-commit
+        uses: pre-commit/action@v2.0.3
+
+      - name: Convert Coverage
+        run: coverage xml --fail-under=0
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2.0.3
+        with:
+          flags: unit
+          fail_ci_if_error: true
+
+  multi:
+    needs: pre_commit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.7', '3.8', '3.10'] # 3.9 is done in the job above
+    name: Python ${{ matrix.python-version }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2.3.4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2.2.2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+
+      - name: Setup Nox
+        run: pip install nox==2022.1.7
+
+      - name: Setup Poetry
+        run: pip install poetry==1.1.13
+
+      - name: Run Tests
+        run: nox -s tests -p ${{ matrix.python-version }}

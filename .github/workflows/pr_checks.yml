@@ -1,0 +1,27 @@
+name: PR
+
+on:
+  pull_request_target:
+    types: [opened, labeled, unlabeled, synchronize]
+
+jobs:
+  label:
+    name: Check Labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Has semver label
+        if: github.base_ref != 'master'
+        uses: jesusvasquez333/verify-pr-label-action@v1.4.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          valid-labels: 'major, minor, patch'
+          pull-request-number: ${{ github.event.pull_request.number }}
+          disable-reviews: true
+
+      - name: Has change type label
+        uses: jesusvasquez333/verify-pr-label-action@v1.4.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          valid-labels: 'feature, enhancement, fix, bugfix, bug, chore'
+          pull-request-number: ${{ github.event.pull_request.number }}
+          disable-reviews: true
