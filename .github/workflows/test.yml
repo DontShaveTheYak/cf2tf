@@ -29,7 +29,7 @@ jobs:
           poetry install
 
       - name: Setup requirements
-        run: pip install nox nox_poetry pre-commit
+        run: pip install nox nox_poetry pre-commit coverage[toml]
 
       - name: Run Pre-commit
         run: pre-commit run --all-files
