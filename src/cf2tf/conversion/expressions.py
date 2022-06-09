@@ -386,6 +386,7 @@ def get_att(template: "TemplateConverter", values: Any):
     if "." in cf_property:
         cf_property, *nested_prop = cf_property.split(".")
 
+    log.debug(f"Fn::GetAtt - Looking up resource {cf_name}")
     cf_resource = template.resource_lookup(cf_name, ["Resources"])
 
     if not cf_resource:
@@ -397,6 +398,7 @@ def get_att(template: "TemplateConverter", values: Any):
         raise Exception("Type is required")
 
     docs_path = template.search_manager.find(resource_type)
+    log.debug(f"Fn::GetAtt - Parsing attributes for {docs_path}")
     valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
 
     result = cf2tf.convert.matcher(cf_property, valid_arguments + valid_attributes, 50)
@@ -765,25 +767,9 @@ def ref(template: "TemplateConverter", var_name: str):
         str: Terraform equivalent expression.
     """
 
-    # var_name = pascal_to_snake(var_name)
-
     if "AWS::" in var_name:
-        pseudo = var_name.replace("AWS::", "")
 
-        # Can't treat region like a normal pseduo because
-        # we don't want to update the class var for every run.
-        if pseudo == "Region":
-
-            # todo This is a bug, multiple blocks can have the same name as long as they have different block types
-            # if not template.block_lookup("current", block_type=hcl2.Data):
-            #     region_data = hcl2.Data("current", "region", {})
-            #     template.resources.insert(0, region_data)
-
-            return "data.aws_region.current.name"
-        try:
-            return getattr(template, pseudo)
-        except AttributeError:
-            raise ValueError(f"Unrecognized AWS Pseduo variable: '{var_name}'.")
+        return handle_pseduo_var(template, var_name)
 
     cf_param = template.resource_lookup(var_name, ["Parameters"])
 
@@ -803,6 +789,42 @@ def ref(template: "TemplateConverter", var_name: str):
         return f"{tf_type}.{tf_name}.{first_attr}"
 
     raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
+
+
+pseduo_values = {
+    "Region": hcl2.Data("current", "aws_region", valid_attributes=["name"]),
+    "AccountId": hcl2.Data(
+        "current", "aws_caller_identity", valid_attributes=["account_id"]
+    ),
+    "Partition": hcl2.Data("current", "aws_partition", valid_attributes=["partition"]),
+}
+
+
+def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str):
+
+    pseudo_type = pseudo_name.replace("AWS::", "")
+
+    if pseudo_type not in pseduo_values:
+
+        if pseudo_type == "NoValue":
+            return "null"
+
+        if pseudo_type == "URLSuffix":
+            block = pseduo_values["Partition"]
+
+            if block not in template.post_proccess_blocks:
+                template.post_proccess_blocks.insert(0, block)
+
+            return block.ref("dns_suffix")
+
+        raise ValueError(f"Unable to process pseudo var {pseudo_name}.")
+
+    block = pseduo_values[pseudo_type]
+
+    if block not in template.post_proccess_blocks:
+        template.post_proccess_blocks.insert(0, block)
+
+    return "data.aws_region.current.name"
 
 
 def wrap_in_curlys(input: str):

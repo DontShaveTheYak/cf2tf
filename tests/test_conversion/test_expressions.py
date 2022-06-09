@@ -490,6 +490,26 @@ ref_tests = [
         "aws_s3_bucket.bar.id",
         no_exception(),
     ),
+    (
+        "AWS::Region",
+        "data.aws_region.current.name",
+        no_exception(),
+    ),
+    (
+        "AWS::Fake",
+        None,
+        pytest.raises(ValueError),
+    ),
+    (
+        "AWS::NoValue",
+        "null",
+        no_exception(),
+    ),
+    (
+        "AWS::URLSuffix",
+        "data.aws_partition.current.dns_suffix",
+        no_exception(),
+    ),
 ]
 
 

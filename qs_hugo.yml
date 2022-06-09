@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   Setup CICD pipeline to build and publish content of Hugo based website from
   AWS CodeCommit repo to s3 bucket.
+Mappings:
+  RegionMap:
+    us-east-1:
+      HVM64: ami-0ff8a91507f77f867
+      HVMG2: ami-0a584ac55a7631c0c
 Resources:
   ArtifactBucket:
     Type: 'AWS::S3::Bucket'

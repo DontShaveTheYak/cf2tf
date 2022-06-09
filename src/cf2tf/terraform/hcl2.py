@@ -1,7 +1,7 @@
 """Defines classes and methods for creating and interacting with HCL syntax."""
 
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import logging
 
@@ -13,18 +13,27 @@ class Block:
         self,
         block_type: str,
         labels: List[str],
-        arguments: Dict[str, Any],
-        valid_arguments: List[str],
-        valid_attributes: List[str],
+        arguments: Optional[Dict[str, Any]] = None,
+        valid_arguments: Optional[List[str]] = None,
+        valid_attributes: Optional[List[str]] = None,
     ) -> None:
         self.block_type = block_type
         self.labels = labels
-        self.arguments = arguments
-        self.valid_arguments = valid_arguments
-        self.valid_attributes = valid_attributes
+        self.arguments = arguments if arguments else {}
+        self.valid_arguments = valid_arguments if valid_arguments else []
+        self.valid_attributes = valid_attributes if valid_attributes else []
+
+    def base_ref(self):
+        return f"{self.block_type}.{'.'.join(self.labels)}"
 
     def __repr__(self) -> str:
-        return f"{self.block_type}.{'.'.join(self.labels)}"
+        return self.base_ref()
+
+    def ref(self, attribute_name: Optional[str] = None):
+        if not attribute_name:
+            return f"{self.base_ref()}.{self.valid_attributes[0]}"
+
+        return f"{self.base_ref()}.{attribute_name}"
 
     def write(self):
 
@@ -74,13 +83,13 @@ class Data(Block):
         self,
         name: str,
         type: str,
-        arguments: Dict[str, Any],
+        arguments: Optional[Dict[str, Any]] = None,
+        valid_arguments: Optional[List[str]] = None,
+        valid_attributes: Optional[List[str]] = None,
     ) -> None:
         self.name = name
         self.type = type
 
-        valid_arguments = ["state"]
-        valid_attributes = ["state", "names"]
         super().__init__(
             "data",
             [self.type, self.name],

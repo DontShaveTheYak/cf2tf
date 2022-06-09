@@ -16,6 +16,12 @@ Parameters:
       - 'FALSE'
     Default: 'FALSE'
 
+Mappings:
+  RegionMap:
+    us-east-1:
+      HVM64: ami-0ff8a91507f77f867
+      HVMG2: ami-0a584ac55a7631c0c
+
 Conditions:
   RetainBucket: !Equals [ !Ref KeepBucket, "TRUE" ]
   DeleteBucket: !Equals [ !Ref KeepBucket, "FALSE" ]

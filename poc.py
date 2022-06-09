@@ -1,8 +1,8 @@
-from operator import eq
 from typing import Dict, Any, Union
 from cfn_tools import dump_yaml, load_yaml
 from pathlib import Path
 import yaml
+
 
 def from_yaml(template_path: Union[str, Path]) -> Dict[str, Any]:
     """Loads a Cloudformation template from file.
@@ -25,6 +25,7 @@ def from_yaml(template_path: Union[str, Path]) -> Dict[str, Any]:
 
     return template
 
+
 def solve(equation: Dict[str, list]):
     # print(equation)
 
@@ -32,20 +33,20 @@ def solve(equation: Dict[str, list]):
 
     conditional_name = values.pop()
 
+
 class Output:
     def __init__(self, name: str, values: Dict[str, Any]) -> None:
         # print(values)
         self.name = name
-        self.attributes: Dict[str,str] = {}
+        self.attributes: Dict[str, str] = {}
 
-        self.attributes['description'] = values.get('Description', '')
-        self.attributes['value'] = values.get('Value', '')
+        self.attributes["description"] = values.get("Description", "")
+        self.attributes["value"] = values.get("Value", "")
 
     def convert(self):
 
-        if isinstance(self.attributes['value'], dict):
-            solve(self.attributes['value'])
-
+        if isinstance(self.attributes["value"], dict):
+            solve(self.attributes["value"])
 
         newline = "\n"
         return f"""output "{self.name}" {{
@@ -53,16 +54,16 @@ class Output:
 }}
         """
 
+
 class Parameter:
     def __init__(self, name: str, values: Dict[str, Any]) -> None:
         # print(values)
         self.name = name
-        self.attributes: Dict[str,str] = {}
+        self.attributes: Dict[str, str] = {}
 
-        self.attributes['description'] = values.get('Description', '')
-        self.attributes['default'] = values.get('Default', '')
-        self.attributes['type'] = values.get('Type', '').lower()
-
+        self.attributes["description"] = values.get("Description", "")
+        self.attributes["default"] = values.get("Default", "")
+        self.attributes["type"] = values.get("Type", "").lower()
 
     def convert(self):
 
@@ -73,10 +74,10 @@ class Parameter:
         """
 
 
-if __name__ == '__main__':
-    template = from_yaml('./log_bucket.yaml')
+if __name__ == "__main__":
+    template = from_yaml("./log_bucket.yaml")
 
-    parameters: Dict[str, Dict[str, Any]] = template['Parameters']
+    parameters: Dict[str, Dict[str, Any]] = template["Parameters"]
 
     for param_name in parameters.keys():
         param = Parameter(param_name, parameters[param_name])
