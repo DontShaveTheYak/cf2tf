@@ -93,7 +93,7 @@ jobs:
         run: |
           poetry version ${{needs.tag.outputs.tag}}
           poetry build
-          poetry publish --username '${{ secrets.PYPI_USERNAME }}' --password '${{ secrets.PYPI_PASSWORD }}'
+          poetry publish --username '${{ secrets.PYPI_USERNAME }}' --password '${{ secrets.PYPI_TOKEN }}'
 
   release:
     name: Create Release
