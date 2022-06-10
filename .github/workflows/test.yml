@@ -10,9 +10,9 @@ on:
       - '.github/workflows/pr_checks.yml'
 
 jobs:
-  pre_commit:
+  single:
     runs-on: ubuntu-latest
-    name: Pre-commit
+    name: Python 3.9
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2.3.4
