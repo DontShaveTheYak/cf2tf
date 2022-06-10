@@ -29,10 +29,10 @@ jobs:
           poetry install
 
       - name: Setup requirements
-        run: pip install nox nox_poetry pre-commit coverage[toml]
+        run: pip install nox nox_poetry coverage[toml]
 
-      - name: Run Pre-commit
-        run: pre-commit run --all-files
+      - name: Run Tests
+        run: nox -s tests -p 3.9
 
       - name: Convert Coverage
         run: coverage xml --fail-under=0
