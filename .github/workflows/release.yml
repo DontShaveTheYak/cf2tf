@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  pull_request:
+    types: closed
+
+jobs:
+  tag:
+    name: Create Tag
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged && (github.base_ref == 'develop' || github.base_ref == 'master')
+    outputs:
+      tag: ${{ steps.bump.outputs.next_tag }}
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2.3.4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.9
+        uses: actions/setup-python@v2.2.2
+        with:
+          python-version: '3.9'
+          architecture: x64
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .scripts/requirements.txt
+          pip install poetry==1.1.4
+
+      - name: Get Latest Tag
+        id: latest_tag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+
+      - name: Calculate base tag
+        id: calculate
+        run: python .scripts/bump.py ${{ steps.latest_tag.outputs.tag }} ${{ github.event.pull_request.number }} ${{ github.base_ref }}
+
+      - name: Bump version
+        id: bump
+        run: |
+          if [ "$BUMP_RULE" = "None" ]; then
+              echo "::set-output name=next_tag::$(echo $BASE_TAG)"
+          else
+              poetry version $BASE_TAG
+              poetry version $BUMP_RULE
+              NEXT_TAG=$(poetry version -s)
+              echo "::set-output name=next_tag::$(echo $NEXT_TAG)"
+          fi
+        env:
+          BASE_TAG: ${{ steps.calculate.outputs.base_tag }}
+          BUMP_RULE: ${{ steps.calculate.outputs.bump_rule }}
+
+      - name: Create Tag
+        id: create_tag
+        uses: K-Phoen/semver-release-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          release_branch: ${{ github.base_ref }}
+          release_strategy: tag
+          tag: ${{ steps.bump.outputs.next_tag }}
+
+  publish:
+    name: Publish Package
+    runs-on: ubuntu-latest
+    needs: tag
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2.3.4
+
+      - name: Setup Python 3.9
+        uses: actions/setup-python@v2.2.2
+        with:
+          python-version: '3.9'
+          architecture: x64
+
+      - name: Setup Poetry
+        run: pip install poetry==1.1.4
+
+      - name: Publish to Test PyPI
+        if: github.base_ref == 'develop'
+        run: |
+          poetry version ${{needs.tag.outputs.tag}}
+          poetry build
+          poetry config repositories.testpypi https://test.pypi.org/legacy/
+          poetry publish -r testpypi --username '${{ secrets.PYPI_USERNAME }}' --password '${{ secrets.TEST_PYPI_TOKEN }}'
+
+      - name: Publish to PyPI
+        if: github.base_ref == 'master'
+        run: |
+          poetry version ${{needs.tag.outputs.tag}}
+          poetry build
+          poetry publish --username '${{ secrets.PYPI_USERNAME }}' --password '${{ secrets.PYPI_TOKEN }}'
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [tag, publish]
+    steps:
+      - name: Create Draft Release
+        uses: release-drafter/release-drafter@v5.15.0
+        if: github.base_ref == 'develop'
+        with:
+          tag: ${{needs.tag.outputs.tag}}
+          version: ${{needs.tag.outputs.tag}}
+          commitish: develop
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: release-drafter/release-drafter@v5.15.0
+        if: github.base_ref == 'master'
+        with:
+          tag: ${{needs.tag.outputs.tag}}
+          version: ${{needs.tag.outputs.tag}}
+          publish: true
+          commitish: master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
