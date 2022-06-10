@@ -7,7 +7,8 @@ import requests
 
 import semver
 
-repo: str = "cloud-radar"
+# Should really get these from CICD :Rip:
+repo: str = "cf2tf"
 owner: str = "DontShaveTheYak"
 
 
