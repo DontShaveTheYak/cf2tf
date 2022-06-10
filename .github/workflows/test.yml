@@ -34,6 +34,9 @@ jobs:
       - name: Run Tests
         run: nox -s tests -p 3.9
 
+      - name: Combine Coverage reports
+        run: nox -s coverage -p 3.9
+
       - name: Convert Coverage
         run: coverage xml --fail-under=0
 
