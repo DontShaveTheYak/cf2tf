@@ -86,7 +86,7 @@ jobs:
           poetry version ${{needs.tag.outputs.tag}}
           poetry build
           poetry config repositories.testpypi https://test.pypi.org/legacy/
-          poetry publish -r testpypi --username '${{ secrets.PYPI_USERNAME }}' --password '${{ secrets.TEST_PYPI_PASSWORD }}'
+          poetry publish -r testpypi --username '${{ secrets.PYPI_USERNAME }}' --password '${{ secrets.TEST_PYPI_TOKEN }}'
 
       - name: Publish to PyPI
         if: github.base_ref == 'master'
