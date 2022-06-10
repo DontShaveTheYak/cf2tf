@@ -47,7 +47,7 @@ jobs:
           fail_ci_if_error: true
 
   multi:
-    needs: pre_commit
+    needs: single
     runs-on: ubuntu-latest
     strategy:
       matrix:
