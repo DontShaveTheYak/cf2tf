@@ -15,6 +15,7 @@ click_log.basic_config(log)
 
 
 @click.command()
+@click.version_option()
 @click.option("--output", "-o", type=click.Path(exists=False))
 @click_log.simple_verbosity_option(log)
 @click.argument("template_path", type=click.Path(exists=True))
