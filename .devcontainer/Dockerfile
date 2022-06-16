@@ -60,5 +60,4 @@ RUN --mount=type=cache,target=/home/vscode/.pyenv/cache,uid=1000 \
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
 # Install nox and pre-commit to automate CI stuff
-RUN --mount=type=cache,target=/home/vscode/.cache/pip,uid=1000 \
-    pip install --user --upgrade nox nox_poetry pre-commit
+RUN pip install --user --upgrade nox nox_poetry pre-commit
