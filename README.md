@@ -6,10 +6,10 @@
 *** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
 *** https://www.markdownguide.org/basic-syntax/#reference-style-links
 -->
-<!-- [![Python][python-shield]][pypi-url] -->
-<!-- [![Latest][version-shield]][pypi-url] -->
-<!-- [![Tests][test-shield]][test-url] -->
-<!-- [![Coverage][codecov-shield]][codecov-url] -->
+[![Python][python-shield]][pypi-url]
+[![Latest][version-shield]][pypi-url]
+[![Tests][test-shield]][test-url]
+[![Coverage][codecov-shield]][codecov-url]
 <!-- [![License][license-shield]][license-url] -->
 <!-- [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
@@ -151,7 +151,7 @@ Levi - [@shady_cuz](https://twitter.com/shady_cuz)
 [pypi-url]: https://pypi.org/project/cf2tf/
 [test-shield]: https://img.shields.io/github/workflow/status/DontShaveTheYak/cf2tf/Tests?label=Tests&style=for-the-badge
 [test-url]: https://github.com/DontShaveTheYak/cf2tf/actions?query=workflow%3ATests+branch%3Amaster
-[codecov-shield]: https://img.shields.io/codecov/c/gh/DontShaveTheYak/cf2tf?color=green&style=for-the-badge&token=NE5C92139X
+[codecov-shield]: https://img.shields.io/codecov/c/gh/DontShaveTheYak/cf2tf/master?color=green&style=for-the-badge&token=bfF18q99Fl
 [codecov-url]: https://codecov.io/gh/DontShaveTheYak/cf2tf
 [contributors-shield]: https://img.shields.io/github/contributors/DontShaveTheYak/cf2tf.svg?style=for-the-badge
 [contributors-url]: https://github.com/DontShaveTheYak/cf2tf/graphs/contributors
