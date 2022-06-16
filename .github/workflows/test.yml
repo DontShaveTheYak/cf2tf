@@ -15,10 +15,10 @@ jobs:
     name: Python 3.9
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v3.0.2
 
       - name: Setup Latest Python
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v4.0.0
         with:
           python-version: 3.9
           architecture: x64
@@ -41,7 +41,7 @@ jobs:
         run: coverage xml --fail-under=0
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2.0.3
+        uses: codecov/codecov-action@v3.1.0
         with:
           flags: unit
           fail_ci_if_error: true
@@ -55,10 +55,10 @@ jobs:
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v3.0.2
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v4.0.0
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
