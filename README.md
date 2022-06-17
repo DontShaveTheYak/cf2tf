@@ -10,7 +10,7 @@
 [![Latest][version-shield]][pypi-url]
 [![Tests][test-shield]][test-url]
 [![Coverage][codecov-shield]][codecov-url]
-<!-- [![License][license-shield]][license-url] -->
+[![License][license-shield]][license-url]
 <!-- [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]

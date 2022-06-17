@@ -6,6 +6,7 @@ readme = "README.md"
 authors = ["Levi Blaney <shadycuz@gmail.com>"]
 repository = "https://github.com/DontShaveTheYak/cf2tf"
 keywords = ["cloudformation", "terraform", "cf2tf", "convert", "cloud", "conversion"]
+license = "GPL-3.0-only"
 
 [tool.poetry.scripts]
 cf2tf = "cf2tf.app:cli"
