@@ -106,7 +106,10 @@ If `some_dir` doesn't exist, then it will be created for you. Then each resource
 ## Roadmap
 
 - Better conversion of Cloudformation Maps to Terraform (Maps, Block and json)
-- Allow overides for specific resources.
+- Allow overides for specific resources
+- Handle more advanced Cloudformation parameter types like SSM/Secrets manager
+- Better handling of Recources/Properties that failed conversion
+- Only download files needed, not entire terraform source code (200MB)
 
 See the [open issues](https://github.com/DontShaveTheYak/cf2tf/issues) for a list of proposed features (and known issues).
 
