@@ -319,18 +319,6 @@ def test_find_in_map(fake_tc: TemplateConverter):
 
     assert "Unable to find fakeMap" in str(key_error)
 
-    # Test for top level key
-    with pytest.raises(KeyError) as e:
-        expressions.find_in_map(fake_tc, [map_name, "fake_cop", second_level_key])
-
-    assert "Unable to find key fake_cop" in str(e)
-
-    # test for second level key
-    with pytest.raises(KeyError) as e:
-        expressions.find_in_map(fake_tc, [map_name, top_level_key, "fake_second"])
-
-    assert "Unable to find key fake_second" in str(e)
-
     expected_result = f'local.{map_name}["{top_level_key}"]["{second_level_key}"]'
 
     result = expressions.find_in_map(
