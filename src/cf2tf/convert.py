@@ -391,9 +391,9 @@ def matcher(search_term: str, search_items: List[str], score_cutoff=0):
     return result
 
 
-def camel_case_split(str) -> str:
+def camel_case_split(text: str) -> str:
 
-    items = re.findall(r"[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))", str)
+    items = re.findall(r"[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))", text)
 
     return " ".join(items)
 
