@@ -488,14 +488,25 @@ def parse_subsection(arg_name: str, prop_value: Any, docs_path: Path):
 
         return arg_name, prop_value
 
-    if not isinstance(prop_value, dict):
+    if not isinstance(prop_value, (dict, list)):
         raise TypeError(
-            f"Found section {section_name} but prop_value was {type(prop_value).__name__} not dict."
+            f"Found section {section_name} but prop_value was {type(prop_value).__name__} not dict or list."
         )
 
     valid_sub_args = doc_file.read_section(docs_path, section_name)
 
     log.debug(f"Valid {arg_name} arguments are {valid_sub_args}")
+
+    # todo Sometimes cloudformation uses a list of objects but terraform uses nested blocks.
+    # We dont current support nested blocks correctly but we should still be able to parse them
+    if isinstance(prop_value, list):
+
+        sub_args = [
+            props_to_args(sub_props, valid_sub_args, docs_path)
+            for sub_props in prop_value
+        ]
+
+        return arg_name, sub_args
 
     sub_attrs = props_to_args(prop_value, valid_sub_args, docs_path)
     return arg_name, sub_attrs
