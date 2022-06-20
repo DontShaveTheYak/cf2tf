@@ -1,0 +1,3179 @@
+{
+  "Description": "(SO0009) - The AWS CloudFormation template for deployment of the centralized-logging. Version v4.0.1",
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Elasticsearch Configuration"
+          },
+          "Parameters": [
+            "DomainName",
+            "ClusterSize",
+            "AdminEmail"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Spoke Configuration"
+          },
+          "Parameters": [
+            "SpokeAccounts",
+            "SpokeRegions"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Do you want to deploy sample log sources?"
+          },
+          "Parameters": [
+            "DemoTemplate"
+          ]
+        },
+        {
+          "Label": {
+            "default": "Jumpbox Configuration"
+          },
+          "Parameters": [
+            "JumpboxDeploy",
+            "JumpboxKey"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "AdminEmail": {
+          "default": "Admin Email Address"
+        },
+        "DomainName": {
+          "default": "Elasticsearch Domain Name"
+        },
+        "JumpboxKey": {
+          "default": "Key pair for jumpbox"
+        },
+        "JumpboxDeploy": {
+          "default": "Deployment"
+        },
+        "ClusterSize": {
+          "default": "Cluster Size"
+        },
+        "DemoTemplate": {
+          "default": "Sample Logs"
+        },
+        "SpokeAccounts": {
+          "default": "Spoke Accounts"
+        },
+        "SpokeRegions": {
+          "default": "Spoke Regions"
+        }
+      }
+    }
+  },
+  "Parameters": {
+    "DomainName": {
+      "Type": "String",
+      "Default": "centralizedlogging"
+    },
+    "AdminEmail": {
+      "Type": "String",
+      "AllowedPattern": "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+    },
+    "ClusterSize": {
+      "Type": "String",
+      "Default": "Small",
+      "AllowedValues": [
+        "Small",
+        "Medium",
+        "Large"
+      ],
+      "Description": "Elasticsearch cluster size; small (4 data nodes), medium (6 data nodes), large (6 data nodes)"
+    },
+    "DemoTemplate": {
+      "Type": "String",
+      "Default": "No",
+      "AllowedValues": [
+        "No",
+        "Yes"
+      ],
+      "Description": "Deploy demo template for sample data and logs?"
+    },
+    "SpokeAccounts": {
+      "Type": "CommaDelimitedList",
+      "Description": "Account IDs which you want to allow for centralized logging (comma separated list eg. 11111111,22222222)"
+    },
+    "SpokeRegions": {
+      "Type": "CommaDelimitedList",
+      "Default": "All",
+      "Description": "Regions which you want to allow for centralized logging (comma separated list eg. us-east-1,us-west-2)"
+    },
+    "JumpboxDeploy": {
+      "Type": "String",
+      "Default": "No",
+      "AllowedValues": [
+        "No",
+        "Yes"
+      ],
+      "Description": "Do you want to deploy jumbox?"
+    },
+    "JumpboxKey": {
+      "Type": "String",
+      "Description": "Key pair name for jumpbox (You may leave this empty if you chose 'No' above)"
+    },
+    "WindowsAMI": {
+      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+      "Default": "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base"
+    }
+  },
+  "Mappings": {
+    "CLMap": {
+      "Metric": {
+        "SendAnonymousMetric": "Yes",
+        "MetricsEndpoint": "https://metrics.awssolutionsbuilder.com/generic"
+      }
+    },
+    "ESMap": {
+      "NodeCount": {
+        "Small": 4,
+        "Medium": 6,
+        "Large": 6
+      },
+      "MasterSize": {
+        "Small": "c5.large.elasticsearch",
+        "Medium": "c5.large.elasticsearch",
+        "Large": "c5.large.elasticsearch"
+      },
+      "InstanceSize": {
+        "Small": "r5.large.elasticsearch",
+        "Medium": "r5.2xlarge.elasticsearch",
+        "Large": "r5.4xlarge.elasticsearch"
+      }
+    }
+  },
+  "Conditions": {
+    "demoDeploymentCheck": {
+      "Fn::Equals": [
+        {
+          "Ref": "DemoTemplate"
+        },
+        "Yes"
+      ]
+    },
+    "JumpboxDeploymentCheck": {
+      "Fn::Equals": [
+        {
+          "Ref": "JumpboxDeploy"
+        },
+        "Yes"
+      ]
+    },
+    "CDKMetadataAvailable": {
+      "Fn::Or": [
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "af-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ca-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-northwest-1"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-3"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "me-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "sa-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-2"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-west-2"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "HelperRoleD1833F54": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/HelperRole/Resource"
+      }
+    },
+    "HelperRolePolicy175990BAD": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:CreateLogGroup"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":logs:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":log-group:*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":logs:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":log-group:*:log-stream:*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "ec2:DescribeRegions",
+                "logs:PutDestination",
+                "logs:DeleteDestination",
+                "logs:PutDestinationPolicy"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "iam:CreateServiceLinkedRole",
+              "Condition": {
+                "StringLike": {
+                  "iam:AWSServiceName": "es.amazonaws.com"
+                }
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":iam::*:role/aws-service-role/es.amazonaws.com/AWSServiceRoleForAmazonElasticsearchService*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "HelperRolePolicy175990BAD",
+        "Roles": [
+          {
+            "Ref": "HelperRoleD1833F54"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W12",
+              "reason": "* needed, actions do no support resource level permissions"
+            }
+          ]
+        }
+      }
+    },
+    "HelperLambdaAC9474F4": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "solutions-${AWS::Region}"
+          },
+          "S3Key": "centralized-logging/v4.0.1/asset9b4c683682a0773735625e441eabc438ac1d2b4ef65d28093ba33154aaaa2a66.zip"
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "HelperRoleD1833F54",
+            "Arn"
+          ]
+        },
+        "Description": "centralized-logging -  solution helper functions",
+        "Environment": {
+          "Variables": {
+            "LOG_LEVEL": "info",
+            "METRICS_ENDPOINT": {
+              "Fn::FindInMap": [
+                "CLMap",
+                "Metric",
+                "MetricsEndpoint"
+              ]
+            },
+            "SEND_METRIC": {
+              "Fn::FindInMap": [
+                "CLMap",
+                "Metric",
+                "SendAnonymousMetric"
+              ]
+            },
+            "CUSTOM_SDK_USER_AGENT": "AwsSolution/SO0009/v4.0.1"
+          }
+        },
+        "Handler": "index.handler",
+        "Runtime": "nodejs14.x",
+        "Timeout": 300
+      },
+      "DependsOn": [
+        "HelperRoleD1833F54",
+        "HelperRolePolicy175990BAD"
+      ],
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W58",
+              "reason": "CloudWatch logs write permissions added with managed role AWSLambdaBasicExecutionRole"
+            },
+            {
+              "id": "W89",
+              "reason": "Not a valid use case for Lambda functions to be deployed inside a VPC"
+            },
+            {
+              "id": "W92",
+              "reason": "Not a valid use case for Lambda reserved concurrency"
+            }
+          ]
+        }
+      }
+    },
+    "HelperProviderframeworkonEventServiceRole1962DD43": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              ]
+            ]
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/HelperProvider/framework-onEvent/ServiceRole/Resource"
+      }
+    },
+    "HelperProviderframeworkonEventServiceRoleDefaultPolicy7C54367B": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "HelperLambdaAC9474F4",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "HelperProviderframeworkonEventServiceRoleDefaultPolicy7C54367B",
+        "Roles": [
+          {
+            "Ref": "HelperProviderframeworkonEventServiceRole1962DD43"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/HelperProvider/framework-onEvent/ServiceRole/DefaultPolicy/Resource"
+      }
+    },
+    "HelperProviderframeworkonEvent1079DE9D": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "solutions-${AWS::Region}"
+          },
+          "S3Key": "centralized-logging/v4.0.1/assetc691172cdeefa2c91b5a2907f9d81118e47597634943344795f1a844192dd49c.zip"
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "HelperProviderframeworkonEventServiceRole1962DD43",
+            "Arn"
+          ]
+        },
+        "Description": "AWS CDK resource provider framework - onEvent (CL-PrimaryStack/HelperProvider)",
+        "Environment": {
+          "Variables": {
+            "USER_ON_EVENT_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "HelperLambdaAC9474F4",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Handler": "assetc691172cdeefa2c91b5a2907f9d81118e47597634943344795f1a844192dd49c/framework.onEvent",
+        "Runtime": "nodejs12.x",
+        "Timeout": 900
+      },
+      "DependsOn": [
+        "HelperProviderframeworkonEventServiceRoleDefaultPolicy7C54367B",
+        "HelperProviderframeworkonEventServiceRole1962DD43"
+      ],
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W58",
+              "reason": "CloudWatch logs write permissions added with managed role AWSLambdaBasicExecutionRole"
+            },
+            {
+              "id": "W89",
+              "reason": "Not a valid use case for Lambda functions to be deployed inside a VPC"
+            },
+            {
+              "id": "W92",
+              "reason": "Not a valid use case for Lambda reserved concurrency"
+            }
+          ]
+        }
+      }
+    },
+    "CreateUUID": {
+      "Type": "Custom::CreateUUID",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "HelperProviderframeworkonEvent1079DE9D",
+            "Arn"
+          ]
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CreateUUID/Default"
+      }
+    },
+    "CreateESServiceRole": {
+      "Type": "Custom::CreateESServiceRole",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "HelperProviderframeworkonEvent1079DE9D",
+            "Arn"
+          ]
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CreateESServiceRole/Default"
+      }
+    },
+    "LaunchData": {
+      "Type": "Custom::LaunchData",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "HelperProviderframeworkonEvent1079DE9D",
+            "Arn"
+          ]
+        },
+        "SolutionId": "SO0009",
+        "SolutionVersion": "v4.0.1",
+        "SolutionUuid": {
+          "Fn::GetAtt": [
+            "CreateUUID",
+            "UUID"
+          ]
+        },
+        "Stack": "PrimaryStack"
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/LaunchData/Default"
+      }
+    },
+    "ESUserPool7DC126A8": {
+      "Type": "AWS::Cognito::UserPool",
+      "Properties": {
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "verified_email",
+              "Priority": 1
+            }
+          ]
+        },
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true
+        },
+        "AutoVerifiedAttributes": [
+          "email"
+        ],
+        "EmailVerificationMessage": "The verification code to your new account is {####}",
+        "EmailVerificationSubject": "Verify your new account",
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 8,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": true,
+            "RequireUppercase": true,
+            "TemporaryPasswordValidityDays": 3
+          }
+        },
+        "Schema": [
+          {
+            "Mutable": true,
+            "Name": "email",
+            "Required": true
+          }
+        ],
+        "SmsVerificationMessage": "The verification code to your new account is {####}",
+        "UsernameAttributes": [
+          "email"
+        ],
+        "UserPoolAddOns": {
+          "AdvancedSecurityMode": "ENFORCED"
+        },
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_CODE",
+          "EmailMessage": "The verification code to your new account is {####}",
+          "EmailSubject": "Verify your new account",
+          "SmsMessage": "The verification code to your new account is {####}"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESUserPool/Resource"
+      }
+    },
+    "ESUserPoolESCognitoDomain4E1D658B": {
+      "Type": "AWS::Cognito::UserPoolDomain",
+      "Properties": {
+        "Domain": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "DomainName"
+              },
+              "-",
+              {
+                "Fn::GetAtt": [
+                  "CreateUUID",
+                  "UUID"
+                ]
+              }
+            ]
+          ]
+        },
+        "UserPoolId": {
+          "Ref": "ESUserPool7DC126A8"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESUserPool/ESCognitoDomain/Resource"
+      }
+    },
+    "AdminUser": {
+      "Type": "AWS::Cognito::UserPoolUser",
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "ESUserPool7DC126A8"
+        },
+        "UserAttributes": [
+          {
+            "Name": "email",
+            "Value": {
+              "Ref": "AdminEmail"
+            }
+          }
+        ],
+        "Username": {
+          "Ref": "AdminEmail"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/AdminUser"
+      }
+    },
+    "ESIdentityPool": {
+      "Type": "AWS::Cognito::IdentityPool",
+      "Properties": {
+        "AllowUnauthenticatedIdentities": false
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESIdentityPool"
+      }
+    },
+    "CognitoAuthRole7B7E27C0": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "cognito-identity.amazonaws.com:aud": {
+                    "Ref": "ESIdentityPool"
+                  }
+                },
+                "ForAnyValue:StringLike": {
+                  "cognito-identity.amazonaws.com:amr": "authenticated"
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "cognito-identity.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CognitoAuthRole/Resource"
+      }
+    },
+    "IdentityPoolRoleAttachment": {
+      "Type": "AWS::Cognito::IdentityPoolRoleAttachment",
+      "Properties": {
+        "IdentityPoolId": {
+          "Ref": "ESIdentityPool"
+        },
+        "Roles": {
+          "authenticated": {
+            "Fn::GetAtt": [
+              "CognitoAuthRole7B7E27C0",
+              "Arn"
+            ]
+          }
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/IdentityPoolRoleAttachment"
+      }
+    },
+    "ESCognitoRole0FB5690B": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "es.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "cognito-idp:DescribeUserPool",
+                    "cognito-idp:CreateUserPoolClient",
+                    "cognito-idp:DeleteUserPoolClient",
+                    "cognito-idp:DescribeUserPoolClient",
+                    "cognito-idp:AdminInitiateAuth",
+                    "cognito-idp:AdminUserGlobalSignOut",
+                    "cognito-idp:ListUserPoolClients",
+                    "cognito-identity:DescribeIdentityPool",
+                    "cognito-identity:UpdateIdentityPool",
+                    "cognito-identity:SetIdentityPoolRoles",
+                    "cognito-identity:GetIdentityPoolRoles"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "*"
+                }
+              ],
+              "Version": "2012-10-17"
+            },
+            "PolicyName": "ESCognitoAccess"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W11",
+              "reason": "Cognito actions do not allow resource level permissions"
+            }
+          ]
+        }
+      }
+    },
+    "ESCognitoRoleDefaultPolicy007A3108": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "iam:PassRole",
+              "Condition": {
+                "StringLike": {
+                  "iam:PassedToService": "cognito-identity.amazonaws.com"
+                }
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ESCognitoRole0FB5690B",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "ESCognitoRoleDefaultPolicy007A3108",
+        "Roles": [
+          {
+            "Ref": "ESCognitoRole0FB5690B"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESCognitoRole/DefaultPolicy/Resource"
+      }
+    },
+    "FirehoseRoleAA67C190": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "firehose.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/FirehoseRole/Resource"
+      }
+    },
+    "VPCFlowLogGroup9559E1E7": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 731
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W84",
+              "reason": "Log group is encrypted using the CloudWatch server-side encryption keys (AWS Managed Keys)"
+            }
+          ]
+        }
+      }
+    },
+    "flowRole5E4EF2F1": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "vpc-flow-logs.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/flowRole/Resource"
+      }
+    },
+    "flowRoleDefaultPolicyA5122836": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "VPCFlowLogGroup9559E1E7",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "flowRole5E4EF2F1",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "flowRoleDefaultPolicyA5122836",
+        "Roles": [
+          {
+            "Ref": "flowRole5E4EF2F1"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/flowRole/DefaultPolicy/Resource"
+      }
+    },
+    "ESVPC3CEAD2A7": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/Resource"
+      }
+    },
+    "ESVPCESIsolatedSubnetSubnet1SubnetBC48A527": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/24",
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "ESIsolatedSubnet"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated"
+          },
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet1"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet1/Subnet"
+      }
+    },
+    "ESVPCESIsolatedSubnetSubnet1RouteTable122122FC": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet1"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet1/RouteTable"
+      }
+    },
+    "ESVPCESIsolatedSubnetSubnet1RouteTableAssociation9F413854": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ESVPCESIsolatedSubnetSubnet1RouteTable122122FC"
+        },
+        "SubnetId": {
+          "Ref": "ESVPCESIsolatedSubnetSubnet1SubnetBC48A527"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet1/RouteTableAssociation"
+      }
+    },
+    "ESVPCESIsolatedSubnetSubnet2SubnetF8D4DB34": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.1.0/24",
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "ESIsolatedSubnet"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated"
+          },
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet2"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet2/Subnet"
+      }
+    },
+    "ESVPCESIsolatedSubnetSubnet2RouteTable4A8B83E0": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet2"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet2/RouteTable"
+      }
+    },
+    "ESVPCESIsolatedSubnetSubnet2RouteTableAssociationA11EB5C0": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ESVPCESIsolatedSubnetSubnet2RouteTable4A8B83E0"
+        },
+        "SubnetId": {
+          "Ref": "ESVPCESIsolatedSubnetSubnet2SubnetF8D4DB34"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESIsolatedSubnetSubnet2/RouteTableAssociation"
+      }
+    },
+    "ESVPCESPublicSubnetSubnet1Subnet12560704": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.2.0/24",
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "ESPublicSubnet"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public"
+          },
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet1"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W33",
+              "reason": "Subnet allows public ip for jumpbox and demo web server"
+            }
+          ]
+        }
+      }
+    },
+    "ESVPCESPublicSubnetSubnet1RouteTable45432090": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet1"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet1/RouteTable"
+      }
+    },
+    "ESVPCESPublicSubnetSubnet1RouteTableAssociation1E172C60": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ESVPCESPublicSubnetSubnet1RouteTable45432090"
+        },
+        "SubnetId": {
+          "Ref": "ESVPCESPublicSubnetSubnet1Subnet12560704"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet1/RouteTableAssociation"
+      }
+    },
+    "ESVPCESPublicSubnetSubnet1DefaultRoute2AA9703D": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ESVPCESPublicSubnetSubnet1RouteTable45432090"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "ESVPCIGW68E8AEA9"
+        }
+      },
+      "DependsOn": [
+        "ESVPCVPCGW707EC835"
+      ],
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet1/DefaultRoute"
+      }
+    },
+    "ESVPCESPublicSubnetSubnet2Subnet9C1FC6F7": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.3.0/24",
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "ESPublicSubnet"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public"
+          },
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet2"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W33",
+              "reason": "Subnet allows public ip for jumpbox and demo web server"
+            }
+          ]
+        }
+      }
+    },
+    "ESVPCESPublicSubnetSubnet2RouteTableEC1D6B54": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet2"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet2/RouteTable"
+      }
+    },
+    "ESVPCESPublicSubnetSubnet2RouteTableAssociation63160086": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ESVPCESPublicSubnetSubnet2RouteTableEC1D6B54"
+        },
+        "SubnetId": {
+          "Ref": "ESVPCESPublicSubnetSubnet2Subnet9C1FC6F7"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet2/RouteTableAssociation"
+      }
+    },
+    "ESVPCESPublicSubnetSubnet2DefaultRoute93518DD8": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ESVPCESPublicSubnetSubnet2RouteTableEC1D6B54"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "ESVPCIGW68E8AEA9"
+        }
+      },
+      "DependsOn": [
+        "ESVPCVPCGW707EC835"
+      ],
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESPublicSubnetSubnet2/DefaultRoute"
+      }
+    },
+    "ESVPCIGW68E8AEA9": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/IGW"
+      }
+    },
+    "ESVPCVPCGW707EC835": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "InternetGatewayId": {
+          "Ref": "ESVPCIGW68E8AEA9"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/VPCGW"
+      }
+    },
+    "ESVPCESVpcFlowFlowLog10A9B76F": {
+      "Type": "AWS::EC2::FlowLog",
+      "Properties": {
+        "ResourceId": {
+          "Ref": "ESVPC3CEAD2A7"
+        },
+        "ResourceType": "VPC",
+        "TrafficType": "ALL",
+        "DeliverLogsPermissionArn": {
+          "Fn::GetAtt": [
+            "flowRole5E4EF2F1",
+            "Arn"
+          ]
+        },
+        "LogDestinationType": "cloud-watch-logs",
+        "LogGroupName": {
+          "Ref": "VPCFlowLogGroup9559E1E7"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/ESVPC"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESVPC/ESVpcFlow/FlowLog"
+      }
+    },
+    "ESSGE420B5A1": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "CL-PrimaryStack/ESSG",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "ESVPC3CEAD2A7",
+                "CidrBlock"
+              ]
+            },
+            "Description": "allow outbound https",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "ESVPC3CEAD2A7",
+                "CidrBlock"
+              ]
+            },
+            "Description": "allow inbound https traffic",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          }
+        ],
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/ESSG/Resource"
+      }
+    },
+    "ESDomainB45006DA": {
+      "Type": "AWS::Elasticsearch::Domain",
+      "Properties": {
+        "AccessPolicies": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "es:ESHttpGet",
+                "es:ESHttpDelete",
+                "es:ESHttpPut",
+                "es:ESHttpPost",
+                "es:ESHttpHead",
+                "es:ESHttpPatch"
+              ],
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CognitoAuthRole7B7E27C0",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":es:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":domain/",
+                    {
+                      "Ref": "DomainName"
+                    },
+                    "/*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "es:DescribeElasticsearchDomain",
+                "es:DescribeElasticsearchDomains",
+                "es:DescribeElasticsearchDomainConfig",
+                "es:ESHttpPost",
+                "es:ESHttpPut",
+                "es:HttpGet"
+              ],
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "FirehoseRoleAA67C190",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":es:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":domain/",
+                    {
+                      "Ref": "DomainName"
+                    },
+                    "/*"
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "CognitoOptions": {
+          "Enabled": true,
+          "IdentityPoolId": {
+            "Ref": "ESIdentityPool"
+          },
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "ESCognitoRole0FB5690B",
+              "Arn"
+            ]
+          },
+          "UserPoolId": {
+            "Ref": "ESUserPool7DC126A8"
+          }
+        },
+        "DomainEndpointOptions": {
+          "EnforceHTTPS": true,
+          "TLSSecurityPolicy": "Policy-Min-TLS-1-0-2019-07"
+        },
+        "DomainName": {
+          "Ref": "DomainName"
+        },
+        "EBSOptions": {
+          "EBSEnabled": true,
+          "VolumeSize": 10,
+          "VolumeType": "gp2"
+        },
+        "ElasticsearchClusterConfig": {
+          "DedicatedMasterCount": 3,
+          "DedicatedMasterEnabled": true,
+          "DedicatedMasterType": {
+            "Fn::FindInMap": [
+              "ESMap",
+              "MasterSize",
+              {
+                "Ref": "ClusterSize"
+              }
+            ]
+          },
+          "InstanceCount": {
+            "Fn::FindInMap": [
+              "ESMap",
+              "NodeCount",
+              {
+                "Ref": "ClusterSize"
+              }
+            ]
+          },
+          "InstanceType": {
+            "Fn::FindInMap": [
+              "ESMap",
+              "InstanceSize",
+              {
+                "Ref": "ClusterSize"
+              }
+            ]
+          },
+          "ZoneAwarenessConfig": {
+            "AvailabilityZoneCount": 2
+          },
+          "ZoneAwarenessEnabled": true
+        },
+        "ElasticsearchVersion": "7.7",
+        "EncryptionAtRestOptions": {
+          "Enabled": true
+        },
+        "LogPublishingOptions": {},
+        "NodeToNodeEncryptionOptions": {
+          "Enabled": true
+        },
+        "VPCOptions": {
+          "SecurityGroupIds": [
+            {
+              "Fn::GetAtt": [
+                "ESSGE420B5A1",
+                "GroupId"
+              ]
+            }
+          ],
+          "SubnetIds": [
+            {
+              "Ref": "ESVPCESIsolatedSubnetSubnet1SubnetBC48A527"
+            },
+            {
+              "Ref": "ESVPCESIsolatedSubnetSubnet2SubnetF8D4DB34"
+            }
+          ]
+        }
+      },
+      "DependsOn": [
+        "ESUserPoolESCognitoDomain4E1D658B"
+      ],
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W28",
+              "reason": "OpenSearch service uses customer provided domain name"
+            }
+          ]
+        }
+      }
+    },
+    "authRolePolicyAB4A1E56": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "es:ESHttpGet",
+                "es:ESHttpDelete",
+                "es:ESHttpPut",
+                "es:ESHttpPost",
+                "es:ESHttpHead",
+                "es:ESHttpPatch"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ESDomainB45006DA",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "authRolePolicyAB4A1E56",
+        "Roles": [
+          {
+            "Ref": "CognitoAuthRole7B7E27C0"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/authRolePolicy/Resource"
+      }
+    },
+    "dlq09C78ACC": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "KmsMasterKeyId": "alias/aws/sqs"
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/dlq/Resource"
+      }
+    },
+    "CLTransformerServiceRole016CAD3C": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              ]
+            ]
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CLTransformer/ServiceRole/Resource"
+      }
+    },
+    "CLTransformerServiceRoleDefaultPolicyC34581D1": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:SendMessage",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "dlq09C78ACC",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": [
+                "kinesis:DescribeStreamSummary",
+                "kinesis:GetRecords",
+                "kinesis:GetShardIterator",
+                "kinesis:ListShards",
+                "kinesis:SubscribeToShard"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CLDataStream4DFB5423",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "kinesis:DescribeStream",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CLDataStream4DFB5423",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "firehose:PutRecordBatch",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CLFirehose",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "CLTransformerServiceRoleDefaultPolicyC34581D1",
+        "Roles": [
+          {
+            "Ref": "CLTransformerServiceRole016CAD3C"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CLTransformer/ServiceRole/DefaultPolicy/Resource"
+      }
+    },
+    "CLTransformer433F8853": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "solutions-${AWS::Region}"
+          },
+          "S3Key": "centralized-logging/v4.0.1/assetb9316d9a0f47aa8516cdc62510095e3fcad7da2127a60add35eef432d3e28c30.zip"
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CLTransformerServiceRole016CAD3C",
+            "Arn"
+          ]
+        },
+        "DeadLetterConfig": {
+          "TargetArn": {
+            "Fn::GetAtt": [
+              "dlq09C78ACC",
+              "Arn"
+            ]
+          }
+        },
+        "Description": "centralized-logging - Lambda function to transform log events and send to kinesis firehose",
+        "Environment": {
+          "Variables": {
+            "LOG_LEVEL": "info",
+            "SOLUTION_ID": "SO0009",
+            "SOLUTION_VERSION": "v4.0.1",
+            "UUID": {
+              "Fn::GetAtt": [
+                "CreateUUID",
+                "UUID"
+              ]
+            },
+            "CLUSTER_SIZE": {
+              "Ref": "ClusterSize"
+            },
+            "DELIVERY_STREAM": "CL-Firehose",
+            "METRICS_ENDPOINT": {
+              "Fn::FindInMap": [
+                "CLMap",
+                "Metric",
+                "MetricsEndpoint"
+              ]
+            },
+            "SEND_METRIC": {
+              "Fn::FindInMap": [
+                "CLMap",
+                "Metric",
+                "SendAnonymousMetric"
+              ]
+            },
+            "CUSTOM_SDK_USER_AGENT": "AwsSolution/SO0009/v4.0.1"
+          }
+        },
+        "Handler": "index.handler",
+        "Runtime": "nodejs14.x",
+        "Timeout": 300
+      },
+      "DependsOn": [
+        "CLTransformerServiceRoleDefaultPolicyC34581D1",
+        "CLTransformerServiceRole016CAD3C"
+      ],
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W58",
+              "reason": "CloudWatch logs write permissions added with managed role AWSLambdaBasicExecutionRole"
+            },
+            {
+              "id": "W89",
+              "reason": "Not a valid use case for Lambda functions to be deployed inside a VPC"
+            },
+            {
+              "id": "W92",
+              "reason": "Not a valid use case for Lambda reserved concurrency"
+            }
+          ]
+        }
+      }
+    },
+    "CLTransformerKinesisEventSourceCLPrimaryStackCLDataStreamFC34105C3B10D828": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "CLTransformer433F8853"
+        },
+        "BatchSize": 100,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "CLDataStream4DFB5423",
+            "Arn"
+          ]
+        },
+        "StartingPosition": "TRIM_HORIZON"
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CLTransformer/KinesisEventSource:CLPrimaryStackCLDataStreamFC34105C/Resource"
+      }
+    },
+    "TopicBFC7AF6E": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "CL-Lambda-Error",
+        "KmsMasterKeyId": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":kms:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":alias/aws/sns"
+            ]
+          ]
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/Topic/Resource"
+      }
+    },
+    "TopicTokenSubscription178F3F75E": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "Protocol": "email",
+        "TopicArn": {
+          "Ref": "TopicBFC7AF6E"
+        },
+        "Endpoint": {
+          "Ref": "AdminEmail"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/Topic/TokenSubscription:1/Resource"
+      }
+    },
+    "CLLambdaErrorAlarm289F6B50": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "EvaluationPeriods": 1,
+        "AlarmActions": [
+          {
+            "Ref": "TopicBFC7AF6E"
+          }
+        ],
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "CLTransformer433F8853"
+            }
+          }
+        ],
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Threshold": 0.05
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-LambdaError-Alarm/Resource"
+      }
+    },
+    "CLDataStream4DFB5423": {
+      "Type": "AWS::Kinesis::Stream",
+      "Properties": {
+        "ShardCount": 1,
+        "RetentionPeriodHours": 24,
+        "StreamEncryption": {
+          "EncryptionType": "KMS",
+          "KeyId": "alias/aws/kinesis"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CLDataStream/Resource"
+      }
+    },
+    "AccessLogsBucket83982689": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "LogDeliveryWrite",
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W35",
+              "reason": "Access logging disabled on the bucket as its a logging bucket or a demo resource"
+            },
+            {
+              "id": "W51",
+              "reason": "Bucket allows permissions for log delivery"
+            }
+          ]
+        }
+      }
+    },
+    "CLBucket116F9F6B": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "LoggingConfiguration": {
+          "DestinationBucketName": {
+            "Ref": "AccessLogsBucket83982689"
+          },
+          "LogFilePrefix": "cl-access-logs"
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CLBucket/Resource"
+      }
+    },
+    "CLBucketPolicyF1DF7D4F": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "CLBucket116F9F6B"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:Put*",
+                "s3:Get*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "FirehoseRoleAA67C190",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CLBucket116F9F6B",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CLBucket116F9F6B",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CLBucket/Policy/Resource"
+      }
+    },
+    "FirehoseLogGroup1B45149B": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/kinesisfirehose/CL-Firehose",
+        "RetentionInDays": 731
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W84",
+              "reason": "Log group is encrypted using the CloudWatch server-side encryption keys (AWS Managed Keys)"
+            }
+          ]
+        }
+      }
+    },
+    "FirehoseESLogStreamC35DD04E": {
+      "Type": "AWS::Logs::LogStream",
+      "Properties": {
+        "LogGroupName": {
+          "Ref": "FirehoseLogGroup1B45149B"
+        },
+        "LogStreamName": "ElasticsearchDelivery"
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/FirehoseESLogStream/Resource"
+      }
+    },
+    "FirehoseS3LogStreamB4DCF7B1": {
+      "Type": "AWS::Logs::LogStream",
+      "Properties": {
+        "LogGroupName": {
+          "Ref": "FirehoseLogGroup1B45149B"
+        },
+        "LogStreamName": "S3Delivery"
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/FirehoseS3LogStream/Resource"
+      }
+    },
+    "FirehosePolicy3A3B2DF8": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:AbortMultipartUpload",
+                "s3:GetBucketLocation",
+                "s3:GetObject",
+                "s3:ListBucket",
+                "s3:ListBucketMultipartUploads",
+                "s3:PutObject"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "CLBucket116F9F6B"
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "CLBucket116F9F6B"
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "kms:GenerateDataKey",
+                "kms:Decrypt"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "kms:ViaService": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "s3.",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        ".amazonaws.com"
+                      ]
+                    ]
+                  }
+                },
+                "StringLike": {
+                  "kms:EncryptionContext:aws:s3:arn": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition"
+                          },
+                          ":s3:::",
+                          {
+                            "Ref": "CLBucket116F9F6B"
+                          },
+                          "/*"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":kms:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":key/*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": [
+                "ec2:DescribeVpcs",
+                "ec2:DescribeVpcAttribute",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:CreateNetworkInterface",
+                "ec2:CreateNetworkInterfacePermission",
+                "ec2:DeleteNetworkInterface"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": [
+                "es:DescribeElasticsearchDomain",
+                "es:DescribeElasticsearchDomains",
+                "es:DescribeElasticsearchDomainConfig",
+                "es:ESHttpPost",
+                "es:ESHttpPut"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "es:ESHttpGet",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/_all/_settings"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/_cluster/stats"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/cwl-kinesis/_mapping/kinesis"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/_nodes"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/_nodes/*/stats"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/_stats"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":es:",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":domain/",
+                      {
+                        "Ref": "ESDomainB45006DA"
+                      },
+                      "/cwl-kinesis/_stats"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "logs:PutLogEvents",
+                "logs:CreateLogStream"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "FirehoseLogGroup1B45149B",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Condition": {
+                "StringEquals": {
+                  "kms:ViaService": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "kinesis.",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        ".amazonaws.com"
+                      ]
+                    ]
+                  }
+                },
+                "StringLike": {
+                  "kms:EncryptionContext:aws:kinesis:arn": {
+                    "Fn::GetAtt": [
+                      "CLDataStream4DFB5423",
+                      "Arn"
+                    ]
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":kms:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":key/*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "CL-Firehose-Policy",
+        "Roles": [
+          {
+            "Ref": "FirehoseRoleAA67C190"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W12",
+              "reason": "* needed, actions do no support resource level permissions"
+            },
+            {
+              "id": "W76",
+              "reason": "IAM policy verified"
+            }
+          ]
+        }
+      }
+    },
+    "CLFirehose": {
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
+      "Properties": {
+        "DeliveryStreamEncryptionConfigurationInput": {
+          "KeyType": "AWS_OWNED_CMK"
+        },
+        "DeliveryStreamName": "CL-Firehose",
+        "DeliveryStreamType": "DirectPut",
+        "ElasticsearchDestinationConfiguration": {
+          "CloudWatchLoggingOptions": {
+            "Enabled": true,
+            "LogGroupName": "/aws/kinesisfirehose/CL-Firehose",
+            "LogStreamName": {
+              "Ref": "FirehoseESLogStreamC35DD04E"
+            }
+          },
+          "DomainARN": {
+            "Fn::GetAtt": [
+              "ESDomainB45006DA",
+              "Arn"
+            ]
+          },
+          "IndexName": "cwl",
+          "IndexRotationPeriod": "OneDay",
+          "RoleARN": {
+            "Fn::GetAtt": [
+              "FirehoseRoleAA67C190",
+              "Arn"
+            ]
+          },
+          "S3BackupMode": "AllDocuments",
+          "S3Configuration": {
+            "BucketARN": {
+              "Fn::GetAtt": [
+                "CLBucket116F9F6B",
+                "Arn"
+              ]
+            },
+            "CloudWatchLoggingOptions": {
+              "Enabled": true,
+              "LogGroupName": "/aws/kinesisfirehose/CL-Firehose",
+              "LogStreamName": {
+                "Ref": "FirehoseS3LogStreamB4DCF7B1"
+              }
+            },
+            "RoleARN": {
+              "Fn::GetAtt": [
+                "FirehoseRoleAA67C190",
+                "Arn"
+              ]
+            }
+          },
+          "VpcConfiguration": {
+            "RoleARN": {
+              "Fn::GetAtt": [
+                "FirehoseRoleAA67C190",
+                "Arn"
+              ]
+            },
+            "SecurityGroupIds": [
+              {
+                "Fn::GetAtt": [
+                  "ESSGE420B5A1",
+                  "GroupId"
+                ]
+              }
+            ],
+            "SubnetIds": [
+              {
+                "Ref": "ESVPCESIsolatedSubnetSubnet1SubnetBC48A527"
+              },
+              {
+                "Ref": "ESVPCESIsolatedSubnetSubnet2SubnetF8D4DB34"
+              }
+            ]
+          }
+        }
+      },
+      "DependsOn": [
+        "FirehosePolicy3A3B2DF8"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CLFirehose"
+      }
+    },
+    "CWDestinationRole20A8055F": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "logs.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CWDestinationRole/Resource"
+      }
+    },
+    "CWDestPolicy3DD10F82": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "kinesis:PutRecord",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CLDataStream4DFB5423",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "CWDestPolicy3DD10F82",
+        "Roles": [
+          {
+            "Ref": "CWDestinationRole20A8055F"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CWDestPolicy/Resource"
+      }
+    },
+    "HelperRolePolicy285D208F4": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CWDestinationRole20A8055F",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "HelperRolePolicy285D208F4",
+        "Roles": [
+          {
+            "Ref": "HelperRoleD1833F54"
+          }
+        ]
+      },
+      "DependsOn": [
+        "CWDestPolicy3DD10F82"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/HelperRolePolicy2/Resource"
+      }
+    },
+    "CWDestination": {
+      "Type": "Custom::CWDestination",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "HelperProviderframeworkonEvent1079DE9D",
+            "Arn"
+          ]
+        },
+        "Regions": {
+          "Ref": "SpokeRegions"
+        },
+        "DestinationName": {
+          "Fn::Join": [
+            "",
+            [
+              "CL-Destination-",
+              {
+                "Fn::GetAtt": [
+                  "CreateUUID",
+                  "UUID"
+                ]
+              }
+            ]
+          ]
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CWDestinationRole20A8055F",
+            "Arn"
+          ]
+        },
+        "DataStream": {
+          "Fn::GetAtt": [
+            "CLDataStream4DFB5423",
+            "Arn"
+          ]
+        },
+        "SpokeAccounts": {
+          "Ref": "SpokeAccounts"
+        }
+      },
+      "DependsOn": [
+        "HelperRolePolicy285D208F4"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CWDestination/Default"
+      }
+    },
+    "CLJumpboxJumpboxSGD93E94FC": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "CL-PrimaryStack/CL-Jumpbox/JumpboxSG",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "allow outbound https",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80
+          },
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "allow outbound https",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          }
+        ],
+        "VpcId": {
+          "Ref": "ESVPC3CEAD2A7"
+        }
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W5",
+              "reason": "Security group allows outbound traffic for http[s]"
+            }
+          ]
+        }
+      },
+      "Condition": "JumpboxDeploymentCheck"
+    },
+    "CLJumpboxJumpboxEC2InstanceRole92DDA704": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "ec2.",
+                      {
+                        "Ref": "AWS::URLSuffix"
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-Jumpbox/JumpboxEC2"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-Jumpbox/JumpboxEC2/InstanceRole/Resource"
+      }
+    },
+    "CLJumpboxJumpboxEC2InstanceProfile10A8921D": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "CLJumpboxJumpboxEC2InstanceRole92DDA704"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-Jumpbox/JumpboxEC2/InstanceProfile"
+      }
+    },
+    "CLJumpboxJumpboxEC210DE4297": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "IamInstanceProfile": {
+          "Ref": "CLJumpboxJumpboxEC2InstanceProfile10A8921D"
+        },
+        "ImageId": {
+          "Ref": "WindowsAMI"
+        },
+        "InstanceType": "t3.micro",
+        "KeyName": {
+          "Ref": "JumpboxKey"
+        },
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "CLJumpboxJumpboxSGD93E94FC",
+              "GroupId"
+            ]
+          }
+        ],
+        "SubnetId": {
+          "Ref": "ESVPCESPublicSubnetSubnet1Subnet12560704"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-Jumpbox/JumpboxEC2"
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": "<powershell></powershell>"
+        }
+      },
+      "DependsOn": [
+        "CLJumpboxJumpboxEC2InstanceRole92DDA704"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-Jumpbox/JumpboxEC2/Resource"
+      },
+      "Condition": "JumpboxDeploymentCheck"
+    },
+    "CLDemoStackNestedStackCLDemoStackNestedStackResource3DB21482": {
+      "Type": "AWS::CloudFormation::Stack",
+      "Properties": {
+        "TemplateURL": "https://solutions-reference.s3.amazonaws.com/centralized-logging/v4.0.1/aws-centralized-logging-demo.template",
+        "Parameters": {
+          "CWDestinationParm": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":logs:",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ":",
+                {
+                  "Ref": "AWS::AccountId"
+                },
+                ":destination:CL-Destination-",
+                {
+                  "Fn::GetAtt": [
+                    "CreateUUID",
+                    "UUID"
+                  ]
+                }
+              ]
+            ]
+          }
+        }
+      },
+      "DependsOn": [
+        "ESDomainB45006DA"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack.NestedStack/CL-DemoStack.NestedStackResource"
+      },
+      "Condition": "demoDeploymentCheck"
+    },
+    "CDKMetadata": {
+      "Type": "AWS::CDK::Metadata",
+      "Properties": {
+        "Analytics": "v2:deflate64:H4sIAAAAAAAA/2VTXW/bMAz8LX1X1CUdsNel2VoM2DAv6fquyEzCxhY9fTgIDP/3UZLteOuTjifS5J3opVw+rOSHu8/q4ha6PN93mizIbueVPovNwRTKqho82Bj8UE2D5hjhhkyJHsmItXPgOf+Ybsg4b4P2YhOcp3oLjoLVEEsmPCenRj+Db4LvRRykQ1XLbktVrotnQRXqa5poQt+4lzIaCksHrKAXlar3pZLdUzA6zcZJE/7agvG71Him4z3bC/ewUFGUk0kbx7J7DPoM/lE5EBnG4gHl4zbXPO6FpqNBT7L77cAWRFVMmfAIvlCt0Myv3jPxTLpLnhn9dfzYPI5mrT2beqqZZEvo6GT3nY7PlkITsyfMYOctqHpgc9AL0CvZvTY60q/FRhQWW+VhF/Ymy76hLQUPL2qfHyrzN47dI40quV+EPdvxX2V+RF4uJp+5xUVdh6ZDdFMiniq68JDpSQe4Ax0s656k/UuM6zFfFVZXKedRO1BWn2R3czkjfv0/bNivACEVJsCkYfKFGkyuZMBinLbYjJs2j/nZKwrlRfnYZF0pm1xOoBdnNODQxd9s9H80f7g6oIUTOZBxMKiwBXsdU3T6sxZ2+Iuc5P1vsQTbC0MlyDd33y4/yuUnubp7c4gLG3g9apDbfP4F2FLoQfQDAAA="
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CDKMetadata/Default"
+      },
+      "Condition": "CDKMetadataAvailable"
+    }
+  },
+  "Outputs": {
+    "DestinationSubscriptionCommand": {
+      "Description": "Command to run in spoke accounts/regions",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "aws logs put-subscription-filter       --destination-arn arn:",
+            {
+              "Ref": "AWS::Partition"
+            },
+            ":logs:<region>:",
+            {
+              "Ref": "AWS::AccountId"
+            },
+            ":destination:CL-Destination-",
+            {
+              "Fn::GetAtt": [
+                "CreateUUID",
+                "UUID"
+              ]
+            },
+            "       --log-group-name <MyLogGroup>       --filter-name <MyFilterName>       --filter-pattern <MyFilterPattern>       --profile <MyAWSProfile> "
+          ]
+        ]
+      }
+    },
+    "UniqueID": {
+      "Description": "UUID for Centralized Logging Stack",
+      "Value": {
+        "Fn::GetAtt": [
+          "CreateUUID",
+          "UUID"
+        ]
+      }
+    },
+    "AdminEmail": {
+      "Description": "Admin Email address",
+      "Value": {
+        "Ref": "AdminEmail"
+      }
+    },
+    "DomainName": {
+      "Description": "ES Domain Name",
+      "Value": {
+        "Ref": "DomainName"
+      }
+    },
+    "KibanaURL": {
+      "Description": "Kibana URL",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Fn::GetAtt": [
+                "ESDomainB45006DA",
+                "DomainEndpoint"
+              ]
+            },
+            "/_plugin/kibana/"
+          ]
+        ]
+      }
+    },
+    "ClusterSize": {
+      "Description": "ES Cluster Size",
+      "Value": {
+        "Ref": "ClusterSize"
+      }
+    },
+    "DemoDeployment": {
+      "Description": "Demo data deployed?",
+      "Value": {
+        "Ref": "DemoTemplate"
+      }
+    }
+  }
+}
