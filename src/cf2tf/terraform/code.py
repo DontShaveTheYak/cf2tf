@@ -7,6 +7,8 @@ from git import RemoteProgress
 from git.repo.base import Repo
 from thefuzz import fuzz, process  # type: ignore
 
+import cf2tf.convert
+
 from click._termui_impl import ProgressBar
 
 log = logging.getLogger("cf2tf")
@@ -20,7 +22,9 @@ class SearchManager:
 
     def find(self, name: str) -> Path:
 
-        name = name.replace("::", " ").lower().replace("aws", "").strip()
+        name = name.replace("::", " ").replace("AWS", "")
+
+        name = cf2tf.convert.camel_case_split(name).lower().strip()
 
         log.debug(f"Searcing for {name} in terraform docs...")
 
