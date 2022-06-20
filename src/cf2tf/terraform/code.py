@@ -15,8 +15,8 @@ log = logging.getLogger("cf2tf")
 class SearchManager:
     def __init__(self, docs_path: Path) -> None:
         self.docs_path = docs_path
-        self.resources = list(docs_path.joinpath("r").glob("*.html.markdown"))
-        self.datas = list(docs_path.joinpath("d").glob("*.html.markdown"))
+        self.resources = list(docs_path.joinpath("r").glob("*.markdown"))
+        self.datas = list(docs_path.joinpath("d").glob("*.markdown"))
 
     def find(self, name: str) -> Path:
 
