@@ -566,13 +566,10 @@ def select(_tc: "TemplateConverter", values: Any):
             )
         )
 
-    index: int
-    items: Union[List[Any], str]
+    index: int = values[0] if isinstance(values[0], int) else int(values[0].strip('"'))
+    items: Union[List[Any], str] = values[1]
 
-    if isinstance(values[0], int) and isinstance(values[1], (list, str)):
-        index = values[0]
-        items = values[1]
-    else:
+    if not isinstance(index, int) or not isinstance(items, (list, str)):
         raise TypeError(
             "Fn::Select - The first value must be a Number and the second a List or String."
         )

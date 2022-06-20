@@ -523,23 +523,45 @@ def test_ref(input, expected_result, expectation):
     assert result == expected_result
 
 
-def test_select(fake_tc):
+select_tests = [
+    # (input, expected_result, expectation, block)
+    ({}, None, pytest.raises(TypeError)),
+    ([], None, pytest.raises(ValueError)),
+    ([0, {}], None, pytest.raises(TypeError)),
+    ([0, "var.something"], "element(var.something, 0)", no_exception()),
+    (
+        [0, ['"A"', '"B"', '"C"']],
+        'element(["A", "B", "C"], 0)',
+        no_exception(),
+    ),
+    (
+        ['"0"', ['"A"', '"B"', '"C"']],
+        'element(["A", "B", "C"], 0)',
+        no_exception(),
+    ),
+]
 
-    cf_expression = [0, "var.something"]
 
-    expected = "element(var.something, 0)"
+@pytest.mark.parametrize("input, expected_result, expectation", select_tests)
+def test_select(input, expected_result, expectation):
 
-    result = expressions.select(fake_tc, cf_expression)
+    cf_manifest = {
+        "Parameters": [("foo", {"a": "a"})],
+        "Resources": [("bar", {"Type": "AWS::S3::Bucket"})],
+    }
 
-    assert result == expected
+    sm = code.search_manager()
 
-    cf_expression = [0, ['"A"', '"B"', '"C"']]
+    tc = TemplateConverter({}, sm)
+    tc.manifest = cf_manifest
 
-    expected = 'element(["A", "B", "C"], 0)'
+    # This is needed for tests that raise an exception
+    result = expected_result
 
-    result = expressions.select(fake_tc, cf_expression)
+    with expectation:
+        result = expressions.select(tc, input)
 
-    assert result == expected
+    assert result == expected_result
 
 
 def test_split(fake_tc):

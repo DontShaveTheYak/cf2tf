@@ -150,6 +150,10 @@ class TemplateConverter:
             return [self.resolve_values(item, allowed_func) for item in data]
         else:
 
+            # todo What should we being doing with an integer? It shouldn't really be quoted?
+            # at least not on the terraform side? I think the code below will pass a 0 int value
+            # but will quote a 1
+
             # This weirdess handles an empty string like "",
             # with out it, it becomes """" when printed()
             if not data:
