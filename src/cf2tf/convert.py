@@ -112,7 +112,12 @@ class TemplateConverter:
 
         return tf_resources
 
-    def resolve_values(self, data: Any, allowed_func: functions.Dispatch) -> Any:
+    def resolve_values(
+        self,
+        data: Any,
+        allowed_func: functions.Dispatch,
+        prev_func: Optional[str] = None,
+    ) -> Any:
         """Recurses through a Cloudformation template. Solving all
         references and variables along the way.
 
@@ -125,7 +130,7 @@ class TemplateConverter:
 
         if isinstance(data, dict):
 
-            # for key, value in data.items():
+            key: str
 
             for key in list(data):
 
@@ -135,19 +140,21 @@ class TemplateConverter:
                     return functions.ref(self, value)
 
                 if "Fn::" not in key:
-                    data[key] = self.resolve_values(value, allowed_func)
+                    data[key] = self.resolve_values(value, allowed_func, prev_func)
                     continue
 
                 if key not in allowed_func:
-                    raise ValueError(f"{key} not allowed here.")
+                    raise ValueError(f"{key} not allowed to be nested in {prev_func}.")
 
-                value = self.resolve_values(value, functions.ALLOWED_FUNCTIONS[key])
+                value = self.resolve_values(
+                    value, functions.ALLOWED_FUNCTIONS[key], key
+                )
 
                 return allowed_func[key](self, value)
 
             return data
         elif isinstance(data, list):
-            return [self.resolve_values(item, allowed_func) for item in data]
+            return [self.resolve_values(item, allowed_func, prev_func) for item in data]
         else:
 
             # todo What should we being doing with an integer? It shouldn't really be quoted?
