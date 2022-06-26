@@ -445,10 +445,10 @@ def convert_prop_to_arg(
 
     log.debug(f"Searching for {search_term} instead of {prop_name}")
 
-    result = matcher(search_term, search_items, 50)
+    result = matcher(search_term, search_items, 80)
 
     if not result:
-        log.warning(f"No match found for {prop_name}, commenting out this argument.")
+        log.debug(f"No match found for {prop_name}, commenting out this argument.")
         return f"// CF Property({prop_name})", str(prop_value)
 
     attribute_match, ranking = result
@@ -461,9 +461,13 @@ def convert_prop_to_arg(
     # Terraform sometimes has nested blocks, if prop_value is a map, its possible
     # that tf_attribute_name is a nested block in terraform
 
-    tf_arg, tf_values = parse_subsection(tf_arg_name, prop_value, docs_path)
-
-    return tf_arg, tf_values
+    try:
+        tf_arg, tf_values = parse_subsection(tf_arg_name, prop_value, docs_path)
+        return tf_arg, tf_values
+    except Exception:
+        raise Exception(
+            f"Failed to parse subsection for {prop_name}/{tf_arg_name} in {docs_path}"
+        )
 
 
 def parse_subsection(arg_name: str, prop_value: Any, docs_path: Path):
@@ -483,19 +487,23 @@ def parse_subsection(arg_name: str, prop_value: Any, docs_path: Path):
     if not section_name:
 
         if isinstance(prop_value, dict):
-            log.warn(f"{arg_name} does not have a section in {docs_path}")
+            log.debug(f"{arg_name} has Map value but no subsection in {docs_path}")
             return arg_name, convert_map(prop_value)
 
         return arg_name, prop_value
+
+    valid_sub_args = doc_file.read_section(docs_path, section_name)
+
+    if not valid_sub_args:
+        log.debug(f"{arg_name} has section in {docs_path} but section was empty.")
+        return arg_name, prop_value
+
+    log.debug(f"Valid {arg_name} arguments are {valid_sub_args}")
 
     if not isinstance(prop_value, (dict, list)):
         raise TypeError(
             f"Found section {section_name} but prop_value was {type(prop_value).__name__} not dict or list."
         )
-
-    valid_sub_args = doc_file.read_section(docs_path, section_name)
-
-    log.debug(f"Valid {arg_name} arguments are {valid_sub_args}")
 
     # todo Sometimes cloudformation uses a list of objects but terraform uses nested blocks.
     # We dont current support nested blocks correctly but we should still be able to parse them
