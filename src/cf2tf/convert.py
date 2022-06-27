@@ -2,15 +2,19 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from thefuzz import process  # type: ignore
 
 import cf2tf.conversion.expressions as functions
 import cf2tf.terraform._configuration as config
 import cf2tf.terraform.doc_file as doc_file
-from cf2tf.terraform.code import SearchManager
+
 from cf2tf.terraform.hcl2 import Block, Locals, Output, Resource, Variable
+
+if TYPE_CHECKING:
+    from cf2tf.terraform.code import SearchManager
+
 
 # Wish I could go back to this style of import but getting cycle error
 # from cf2tf.terraform import doc_file, Configuration
@@ -27,7 +31,7 @@ log = logging.getLogger("cf2tf")
 
 
 class TemplateConverter:
-    def __init__(self, cf_template: CFDict, search_manager: SearchManager) -> None:
+    def __init__(self, cf_template: CFDict, search_manager: "SearchManager") -> None:
         self.cf_template = cf_template
         self.search_manager = search_manager
         self.terraform = config.Configuration([])
