@@ -241,6 +241,9 @@ def or_(_tc: "TemplateConverter", values: Any):
     # todo This isnt really correct. We need a way to convert a python
     # data object into a valid terraform argument value, which includes proper quoting
     # and maybe even indentation
+
+    values = _terraform_list(values)
+
     return f"anytrue({values})"
 
 
@@ -531,7 +534,8 @@ def join(_tc: "TemplateConverter", values: Any):
 # todo I'm not sure this is that useful
 def _terraform_list(items: List[Any]):
 
-    items = [item for item in items]
+    # Not sure why I ever did this :thinkingface:
+    # items = [item for item in items]
 
     return f"[{', '.join(items)}]"
 

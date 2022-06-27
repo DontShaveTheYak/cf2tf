@@ -233,7 +233,11 @@ or_tests = [
     ({}, None, pytest.raises(TypeError)),
     ([True], None, pytest.raises(ValueError)),
     ([True] * 11, None, pytest.raises(ValueError)),
-    ([0, 1], "anytrue([0, 1])", no_exception()),
+    (
+        ['var.region == "us-east-1"', 'anytrue(var.region == "us-east-2")'],
+        'anytrue([var.region == "us-east-1", anytrue(var.region == "us-east-2")])',
+        no_exception(),
+    ),
     pytest.param(
         [0, "one", True, "var.test"],
         'anytrue([0, "one", true, var.test])',
