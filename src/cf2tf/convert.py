@@ -165,11 +165,6 @@ class TemplateConverter:
             # at least not on the terraform side? I think the code below will pass a 0 int value
             # but will quote a 1
 
-            # This weirdess handles an empty string like "",
-            # with out it, it becomes """" when printed()
-            if not data:
-                return data
-
             return f'"{data}"'
 
     def convert_parameters(self, parameters: CFResources):
