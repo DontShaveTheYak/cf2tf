@@ -482,6 +482,16 @@ ref_tests = [
         no_exception(),
     ),
     (
+        "AWS::Partition",
+        "data.aws_partition.current.partition",
+        no_exception(),
+    ),
+    (
+        "AWS::AccountId",
+        "data.aws_caller_identity.current.account_id",
+        no_exception(),
+    ),
+    (
         "AWS::Fake",
         None,
         pytest.raises(ValueError),
