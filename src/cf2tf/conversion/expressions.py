@@ -872,7 +872,7 @@ ALLOWED_NESTED_CONDITIONS: Dispatch = {
 # functions that are allowed to be nested inside it.
 ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
     "Fn::And": ALLOWED_NESTED_CONDITIONS,
-    "Fn::Equals": ALLOWED_NESTED_CONDITIONS,
+    "Fn::Equals": {**ALLOWED_NESTED_CONDITIONS, "Fn::Join": join},
     "Fn::If": {
         "Fn::Base64": base64,
         "Fn::FindInMap": find_in_map,
