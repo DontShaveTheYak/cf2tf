@@ -313,17 +313,11 @@ def test_find_in_map(fake_tc: TemplateConverter):
 
     test_args = {map_name: {top_level_key: {second_level_key: "test value"}}}
 
-    locals_block = hcl2.Locals(test_args)
+    locals_block = hcl2.Locals({"mappings": test_args})
 
     fake_tc.post_proccess_blocks.append(locals_block)
 
-    # Test for map name
-    with pytest.raises(KeyError) as key_error:
-        expressions.find_in_map(fake_tc, ["fakeMap", top_level_key, second_level_key])
-
-    assert "Unable to find fakeMap" in str(key_error)
-
-    expected_result = f'local.{map_name}["{top_level_key}"]["{second_level_key}"]'
+    expected_result = f"local.mappings[{map_name}][{top_level_key}][{second_level_key}]"
 
     result = expressions.find_in_map(
         fake_tc, [map_name, top_level_key, second_level_key]
