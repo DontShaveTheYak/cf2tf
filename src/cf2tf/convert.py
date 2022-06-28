@@ -220,9 +220,9 @@ class TemplateConverter:
 
         resolved_values = self.resolve_values(dict_mappings, functions.ALL_FUNCTIONS)
 
-        maps = {name: convert_map(value) for name, value in resolved_values.items()}
+        mapping_args = {"mappings": convert_map(resolved_values)}
 
-        local_block = Locals(maps)
+        local_block = Locals(mapping_args)
 
         self.post_proccess_blocks.append(local_block)
 
