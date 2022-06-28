@@ -819,7 +819,7 @@ def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str):
     if block not in template.post_proccess_blocks:
         template.post_proccess_blocks.insert(0, block)
 
-    return "data.aws_region.current.name"
+    return block.ref()
 
 
 def wrap_in_curlys(input: str):
