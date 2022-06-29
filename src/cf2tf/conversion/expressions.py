@@ -305,9 +305,9 @@ def find_in_map(template: "TemplateConverter", values: Any):
             )
         )
 
-    map_name = values[0].strip('"')
-    top_key = values[1].strip('"')
-    second_key = values[2].strip('"')
+    map_name = values[0]
+    top_key = values[1]
+    second_key = values[2]
 
     # First we need to make sure that locals is a block present in the Terraform template.
     blocks = [
@@ -328,12 +328,14 @@ def find_in_map(template: "TemplateConverter", values: Any):
 
     maps = local_block.arguments
 
-    if map_name not in maps:
-        raise KeyError(f"Unable to find {map_name} in locals block.")
+    if "mappings" not in maps:
+        raise Exception("No Mappings found in locals block.")
 
-    # Checking if the keys are valid doesn't work if the keys were intrinsic functions
+    # Checking if the map names are valid doesn't work if the names were intrinsic functions/vars
 
-    return f'local.{map_name}["{top_key}"]["{second_key}"]'
+    # Checking if the keys are valid doesn't work if the keys were intrinsic functions/vars
+
+    return f"local.mappings[{map_name}][{top_key}][{second_key}]"
 
 
 def get_att(template: "TemplateConverter", values: Any):
@@ -817,7 +819,7 @@ def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str):
     if block not in template.post_proccess_blocks:
         template.post_proccess_blocks.insert(0, block)
 
-    return "data.aws_region.current.name"
+    return block.ref()
 
 
 def wrap_in_curlys(input: str):
@@ -872,7 +874,7 @@ ALLOWED_NESTED_CONDITIONS: Dispatch = {
 # functions that are allowed to be nested inside it.
 ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
     "Fn::And": ALLOWED_NESTED_CONDITIONS,
-    "Fn::Equals": ALLOWED_NESTED_CONDITIONS,
+    "Fn::Equals": {**ALLOWED_NESTED_CONDITIONS, "Fn::Join": join},
     "Fn::If": {
         "Fn::Base64": base64,
         "Fn::FindInMap": find_in_map,

@@ -165,11 +165,6 @@ class TemplateConverter:
             # at least not on the terraform side? I think the code below will pass a 0 int value
             # but will quote a 1
 
-            # This weirdess handles an empty string like "",
-            # with out it, it becomes """" when printed()
-            if not data:
-                return data
-
             return f'"{data}"'
 
     def convert_parameters(self, parameters: CFResources):
@@ -220,9 +215,9 @@ class TemplateConverter:
 
         resolved_values = self.resolve_values(dict_mappings, functions.ALL_FUNCTIONS)
 
-        maps = {name: convert_map(value) for name, value in resolved_values.items()}
+        mapping_args = {"mappings": convert_map(resolved_values)}
 
-        local_block = Locals(maps)
+        local_block = Locals(mapping_args)
 
         self.post_proccess_blocks.append(local_block)
 
