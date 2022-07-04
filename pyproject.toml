@@ -29,7 +29,7 @@ flake8-black = "^0.3.3"
 coverage = {extras = ["toml"], version = "^6.4.1"}
 pytest-cov = "^3.0.0"
 mypy = "^0.961"
-typing-extensions = { version = "^4.2.0", python = "~3.7" }
+typing-extensions = { version = "^4.3.0", python = "~3.7" }
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
