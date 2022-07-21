@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import re
@@ -50,6 +51,13 @@ class TemplateConverter:
             "Outputs",
         ]
 
+    @staticmethod
+    def _json_encoder(value: Any) -> Any:
+        if isinstance(value, (datetime.date, datetime.datetime)):
+            return value.isoformat()
+        else:
+            return value
+
     def convert(self) -> config.Configuration:
         # Should convert the given cloudformation template to a terraform configuration
         self.parse_template()
@@ -82,7 +90,7 @@ class TemplateConverter:
             self.manifest[section] = list(section_values.items())
 
         log.debug(
-            f"Parsed the following resources for processing:\n{json.dumps(self.manifest)}"
+            f"Parsed the following resources for processing:\n{json.dumps(self.manifest, default=self._json_encoder)}"
         )
 
     def resource_lookup(
