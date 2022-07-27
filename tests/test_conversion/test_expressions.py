@@ -627,6 +627,12 @@ sub_s_tests = [
         hcl2.Variable("foo", {"value": "bar"}),
     ),
     (
+        "some $foo",
+        "some $foo",
+        no_exception(),
+        hcl2.Variable("foo", {"value": "bar"}),
+    ),
+    (
         "some ${bar}",
         "some ${aws_s3_bucket.bar.id}",
         no_exception(),
