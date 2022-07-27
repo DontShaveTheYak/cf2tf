@@ -671,12 +671,12 @@ def sub_s(template: "TemplateConverter", value: str):
     """
 
     def replace_var(m):
-        var = m.group(2)
+        var = m.group(1)
 
         result = ref(template, var)
         return wrap_in_curlys(result)
 
-    reVar = r"(?!\$\{\!)\$(\w+|\{([^}]*)\})"
+    reVar = r"(?!\$\{\!)\$\{(\w+[^}]*)\}"
 
     if re.search(reVar, value):
         return re.sub(reVar, replace_var, value).replace("${!", "${")
