@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Optional
 
 import click
@@ -61,8 +62,8 @@ def search_manager():
 
 
 def get_code():
-
-    repo_path = Path("/tmp/terraform_src")
+    temp_dir = Path(gettempdir())
+    repo_path = temp_dir.joinpath("terraform_src")
 
     if repo_path.exists():
 
@@ -78,7 +79,7 @@ def get_code():
 
     repo = Repo.clone_from(
         "https://github.com/hashicorp/terraform-provider-aws.git",
-        "/tmp/terraform_src",
+        repo_path,
         depth=1,
         progress=CloneProgress(),
     )
