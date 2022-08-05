@@ -14,6 +14,13 @@ categories:
     label: 'chore'
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+include-labels:
+  - 'feature'
+  - 'enhancement'
+  - 'fix'
+  - 'bugfix'
+  - 'bug'
+  - 'chore'
 template: |
   ## Changes
 

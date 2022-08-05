@@ -407,7 +407,7 @@ def matcher(search_term: str, search_items: List[str], score_cutoff=0):
 
 def camel_case_split(text: str) -> str:
 
-    items = re.findall(r"[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))", text)
+    items = re.findall(r"[A-Z\d](?:[a-z]+|\d|[A-Z]*(?=[A-Z]|$))", text)
 
     return " ".join(items)
 

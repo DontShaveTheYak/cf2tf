@@ -54,3 +54,24 @@ def test_convert_map(input: Dict[str, Any], expected_result: str):
     actual_result = convert.convert_map(input, 0)
 
     assert actual_result == expected_result
+
+
+camel_case_tests = [
+    # (input, expected_result)
+    (
+        "FooBarBazz",
+        "Foo Bar Bazz",
+    ),
+    (
+        "Foo2Bar",
+        "Foo 2 Bar",
+    ),
+]
+
+
+@pytest.mark.parametrize("input, expected", camel_case_tests)
+def test_camel_case_split(input: str, expected: str):
+
+    result = convert.camel_case_split(input)
+
+    assert result == expected
