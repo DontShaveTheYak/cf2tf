@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Optional
+import re
 
 import click
 from git import RemoteProgress
@@ -29,8 +31,7 @@ class SearchManager:
         log.debug(f"Searcing for {name} in terraform docs...")
 
         files = {
-            doc_file: doc_file.name.split(".")[0].replace("_", " ")
-            for doc_file in self.resources
+            doc_file: transform_file_name(doc_file.name) for doc_file in self.resources
         }
 
         resource_name: str
@@ -61,8 +62,8 @@ def search_manager():
 
 
 def get_code():
-
-    repo_path = Path("/tmp/terraform_src")
+    temp_dir = Path(gettempdir())
+    repo_path = temp_dir.joinpath("terraform_src")
 
     if repo_path.exists():
 
@@ -78,7 +79,7 @@ def get_code():
 
     repo = Repo.clone_from(
         "https://github.com/hashicorp/terraform-provider-aws.git",
-        "/tmp/terraform_src",
+        repo_path,
         depth=1,
         progress=CloneProgress(),
     )
@@ -102,3 +103,16 @@ class CloneProgress(RemoteProgress):
 
     def create_pbar(self, max_count):
         self.pbar = click.progressbar(length=max_count)
+
+
+def transform_file_name(og_name: str):
+    log.debug(f"Tranforming {og_name} for search.")
+
+    no_extensions = og_name.split(".")[0]
+
+    no_underscores = no_extensions.replace("_", " ")
+
+    # Sometimes file names have v2 in them.
+    split_numbers = re.split(r"(v\d)", no_underscores)
+
+    return " ".join([item.strip() for item in split_numbers])
