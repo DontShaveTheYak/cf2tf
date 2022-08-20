@@ -1,5 +1,8 @@
 name: Release
 
+# We only ever want 1 release at a time
+concurrency: release
+
 on:
   pull_request:
     types: closed
