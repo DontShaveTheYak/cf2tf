@@ -1,12 +1,21 @@
+from contextlib import nullcontext as no_exception
 from pathlib import Path
 from typing import Any, Dict
 
 import cf2tf.convert as convert
 import pytest
-from cf2tf.terraform import doc_file, code
+from cf2tf.terraform import code, doc_file
 
-# todo We should not have to checkout the terraform source to run tests
-code.search_manager()
+
+def tc():
+    sm = (
+        code.search_manager()
+    )  # todo We should not have to checkout the terraform source to run tests
+
+    tc = convert.TemplateConverter({}, sm)
+
+    return tc
+
 
 props_to_args_tests = [
     # (props, expected_args, docs_path)
@@ -75,3 +84,17 @@ def test_camel_case_split(input: str, expected: str):
     result = convert.camel_case_split(input)
 
     assert result == expected
+
+
+convert_resources_tests = [
+    # (tc, cf_resource, expectation)
+    (tc(), ("InternetGateway", {"Type": "AWS::EC2::InternetGateway"}), no_exception()),
+    (tc(), ("InternetGateway", {}), pytest.raises(Exception)),
+]
+
+
+@pytest.mark.parametrize("tc, cf_resource, expectation", convert_resources_tests)
+def test_convert_resource(tc: convert.TemplateConverter, cf_resource, expectation):
+
+    with expectation:
+        tc.convert_resources([cf_resource])
