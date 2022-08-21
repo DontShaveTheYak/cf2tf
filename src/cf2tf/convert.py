@@ -282,6 +282,10 @@ class TemplateConverter:
 
             log.debug(f"Found documentation file {docs_path}")
 
+            tf_type = create_resource_type(docs_path)
+
+            log.debug(f"Converted type from {resource_props.get('Type')} to {tf_type}")
+
             valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
 
             log.debug(
@@ -292,15 +296,18 @@ class TemplateConverter:
                 f"Parsed the following attributes from the documentation: \n{valid_attributes}"
             )
 
-            tf_type = create_resource_type(docs_path)
+            properties = resource_props.get("Properties")
 
-            log.debug(f"Converted type from {resource_props.get('Type')} to {tf_type}")
+            if properties is None:
+                resource = Resource(
+                    tf_name, tf_type, {}, valid_arguments, valid_attributes
+                )
+                tf_resources.append(resource)
+                continue
 
             log.debug("Converting the intrinsic functions to Terraform expressions...")
 
-            resolved_values = self.resolve_values(
-                resource_props["Properties"], functions.ALL_FUNCTIONS
-            )
+            resolved_values = self.resolve_values(properties, functions.ALL_FUNCTIONS)
 
             log.debug("Converting property names to argument names...")
 
