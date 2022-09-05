@@ -58,6 +58,11 @@ class TemplateConverter:
         else:
             return value
 
+    def add_post_block(self, block: Block):
+
+        if block not in self.post_proccess_blocks:
+            self.post_proccess_blocks.insert(0, block)
+
     def convert(self) -> config.Configuration:
         # Should convert the given cloudformation template to a terraform configuration
         self.parse_template()
