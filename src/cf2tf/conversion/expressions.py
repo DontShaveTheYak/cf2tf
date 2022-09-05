@@ -835,7 +835,7 @@ CONDITIONS: Dispatch = {
     "Fn::If": if_,
     "Fn::Not": not_,
     "Fn::Or": or_,
-    "Fn::Condition": condition,
+    "Condition": condition,
 }
 
 # These are all the json keys for intrinsic functions
@@ -888,7 +888,7 @@ ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
     },
     "Fn::Not": ALLOWED_NESTED_CONDITIONS,
     "Fn::Or": ALLOWED_NESTED_CONDITIONS,
-    "Fn::Condition": {},  # Only allows strings
+    "Condition": {},  # Only allows strings
     "Fn::Base64": ALL_FUNCTIONS,
     "Fn::Cidr": {
         "Fn::Select": select,

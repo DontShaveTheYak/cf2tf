@@ -129,6 +129,7 @@ class TemplateConverter:
         data: Any,
         allowed_func: functions.Dispatch,
         prev_func: Optional[str] = None,
+        inside_function=False,
     ) -> Any:
         """Recurses through a Cloudformation template. Solving all
         references and variables along the way.
@@ -151,22 +152,31 @@ class TemplateConverter:
                 if key == "Ref":
                     return functions.ref(self, value)
 
-                if "Fn::" not in key:
-                    data[key] = self.resolve_values(value, allowed_func, prev_func)
+                if "Fn::" not in key and not (
+                    key == "Condition" and inside_function is True
+                ):
+                    data[key] = self.resolve_values(
+                        value, allowed_func, prev_func, inside_function=inside_function
+                    )
                     continue
 
                 if key not in allowed_func:
                     raise ValueError(f"{key} not allowed to be nested in {prev_func}.")
 
                 value = self.resolve_values(
-                    value, functions.ALLOWED_FUNCTIONS[key], key
+                    value, functions.ALLOWED_FUNCTIONS[key], key, inside_function=True
                 )
 
                 return allowed_func[key](self, value)
 
             return data
         elif isinstance(data, list):
-            return [self.resolve_values(item, allowed_func, prev_func) for item in data]
+            return [
+                self.resolve_values(
+                    item, allowed_func, prev_func, inside_function=inside_function
+                )
+                for item in data
+            ]
         else:
 
             # todo What should we being doing with an integer? It shouldn't really be quoted?
@@ -200,13 +210,13 @@ class TemplateConverter:
                     converted_arguments["type"]
                 )
 
-            resolved_args = self.resolve_values(
-                converted_arguments, functions.ALL_FUNCTIONS
-            )
+            # resolved_args = self.resolve_values(
+            #     converted_arguments, functions.ALL_FUNCTIONS
+            # )
 
-            log.debug(f"Converted properties to {resolved_args}")
+            # log.debug(f"Converted properties to {resolved_args}")
 
-            var = Variable(tf_name, resolved_args)
+            var = Variable(tf_name, converted_arguments)
 
             tf_vars.append(var)
 
