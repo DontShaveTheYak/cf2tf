@@ -210,12 +210,6 @@ class TemplateConverter:
                     converted_arguments["type"]
                 )
 
-            # resolved_args = self.resolve_values(
-            #     converted_arguments, functions.ALL_FUNCTIONS
-            # )
-
-            # log.debug(f"Converted properties to {resolved_args}")
-
             var = Variable(tf_name, converted_arguments)
 
             tf_vars.append(var)
