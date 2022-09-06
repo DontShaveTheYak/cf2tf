@@ -635,7 +635,7 @@ def split(_tc: "TemplateConverter", values: Any):
             "Fn::Split-- The first value must be a String and the second a String."
         )
 
-    return f'split("{delimiter}", "{source_string}")'
+    return f'split("{delimiter}", {source_string})'
 
 
 def sub(template: "TemplateConverter", values: Any):
@@ -839,6 +839,18 @@ def stack_name_pseduo(template: "TemplateConverter") -> str:
     return "local.stack_name"
 
 
+def stack_id_pseduo(template: "TemplateConverter") -> str:
+    local_block = template.get_block_by_type(hcl2.Locals)
+
+    if not local_block:
+        local_block = hcl2.Locals({})
+        template.add_post_block(local_block)
+
+    local_block.arguments["stack_id"] = f'uuidv5("dns", "{template.name}")'
+
+    return "local.stack_id"
+
+
 pseduo_dispatch: Pseduo_Dispatch = {
     "Region": region_pseduo,
     "AccountId": account_id_pseduo,
@@ -846,6 +858,7 @@ pseduo_dispatch: Pseduo_Dispatch = {
     "NoValue": no_value_pseduo,
     "URLSuffix": url_suffix_pseduo,
     "StackName": stack_name_pseduo,
+    "StackId": stack_id_pseduo,
 }
 
 

@@ -507,6 +507,7 @@ ref_tests = [
         no_exception(),
     ),
     ("AWS::StackName", "local.stack_name", no_exception()),
+    ("AWS::StackId", "local.stack_id", no_exception()),
 ]
 
 
@@ -575,7 +576,7 @@ def test_select(input, expected_result, expectation):
 
 def test_split(fake_tc):
 
-    cf_expression = [",", "A,B,C"]
+    cf_expression = [",", '"A,B,C"']
 
     expected = 'split(",", "A,B,C")'
 
