@@ -13,7 +13,7 @@ def fake_tc() -> TemplateConverter:
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
 
     tc.manifest = {section: [] for section in tc.valid_sections}
     return tc
@@ -506,6 +506,8 @@ ref_tests = [
         "data.aws_partition.current.dns_suffix",
         no_exception(),
     ),
+    ("AWS::StackName", "local.stack_name", no_exception()),
+    ("AWS::StackId", "local.stack_id", no_exception()),
 ]
 
 
@@ -519,7 +521,7 @@ def test_ref(input, expected_result, expectation):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -560,7 +562,7 @@ def test_select(input, expected_result, expectation):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -574,7 +576,7 @@ def test_select(input, expected_result, expectation):
 
 def test_split(fake_tc):
 
-    cf_expression = [",", "A,B,C"]
+    cf_expression = [",", '"A,B,C"']
 
     expected = 'split(",", "A,B,C")'
 
@@ -604,7 +606,7 @@ def test_sub(input, expected_result, expectation, block):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -651,7 +653,7 @@ def test_sub_s(input, expected_result, expectation, block):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -705,7 +707,7 @@ def test_sub_l(input, expected_result, expectation, block):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception

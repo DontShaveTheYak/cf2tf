@@ -18,6 +18,10 @@ log = logging.getLogger("cf2tf")
 
 Dispatch = Dict[str, Callable[..., Any]]
 
+Pseduo_Resolver = Callable[["TemplateConverter"], str]
+
+Pseduo_Dispatch = Dict[str, Pseduo_Resolver]
+
 # todo Most of these exceptions are very similar
 # either we expect a certain type and didnt get it.
 # or we expect a certain length of list and didnt get it.
@@ -631,7 +635,7 @@ def split(_tc: "TemplateConverter", values: Any):
             "Fn::Split-- The first value must be a String and the second a String."
         )
 
-    return f'split("{delimiter}", "{source_string}")'
+    return f'split("{delimiter}", {source_string})'
 
 
 def sub(template: "TemplateConverter", values: Any):
@@ -786,40 +790,89 @@ def ref(template: "TemplateConverter", var_name: str):
     raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
 
 
-pseduo_values = {
-    "Region": hcl2.Data("current", "aws_region", valid_attributes=["name"]),
-    "AccountId": hcl2.Data(
-        "current", "aws_caller_identity", valid_attributes=["account_id"]
-    ),
-    "Partition": hcl2.Data("current", "aws_partition", valid_attributes=["partition"]),
+def region_pseduo(template: "TemplateConverter") -> str:
+    block = hcl2.Data("current", "aws_region", valid_attributes=["name"])
+
+    template.add_post_block(block)
+
+    return block.ref()
+
+
+def account_id_pseduo(template: "TemplateConverter") -> str:
+    block = hcl2.Data("current", "aws_caller_identity", valid_attributes=["account_id"])
+
+    template.add_post_block(block)
+
+    return block.ref()
+
+
+def partition_pseduo(template: "TemplateConverter") -> str:
+    block = hcl2.Data("current", "aws_partition", valid_attributes=["partition"])
+
+    template.add_post_block(block)
+
+    return block.ref()
+
+
+def no_value_pseduo(_: "TemplateConverter") -> str:
+
+    return "null"
+
+
+def url_suffix_pseduo(template: "TemplateConverter") -> str:
+    block = hcl2.Data("current", "aws_partition", valid_attributes=["partition"])
+
+    template.add_post_block(block)
+
+    return block.ref("dns_suffix")
+
+
+def stack_name_pseduo(template: "TemplateConverter") -> str:
+    local_block = template.get_block_by_type(hcl2.Locals)
+
+    if not local_block:
+        local_block = hcl2.Locals({})
+        template.add_post_block(local_block)
+
+    local_block.arguments["stack_name"] = template.name
+
+    return "local.stack_name"
+
+
+def stack_id_pseduo(template: "TemplateConverter") -> str:
+    local_block = template.get_block_by_type(hcl2.Locals)
+
+    if not local_block:
+        local_block = hcl2.Locals({})
+        template.add_post_block(local_block)
+
+    local_block.arguments["stack_id"] = f'uuidv5("dns", "{template.name}")'
+
+    return "local.stack_id"
+
+
+pseduo_dispatch: Pseduo_Dispatch = {
+    "Region": region_pseduo,
+    "AccountId": account_id_pseduo,
+    "Partition": partition_pseduo,
+    "NoValue": no_value_pseduo,
+    "URLSuffix": url_suffix_pseduo,
+    "StackName": stack_name_pseduo,
+    "StackId": stack_id_pseduo,
 }
 
 
-def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str):
+def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str) -> str:
 
     pseudo_type = pseudo_name.replace("AWS::", "")
 
-    if pseudo_type not in pseduo_values:
-
-        if pseudo_type == "NoValue":
-            return "null"
-
-        if pseudo_type == "URLSuffix":
-            block = pseduo_values["Partition"]
-
-            if block not in template.post_proccess_blocks:
-                template.post_proccess_blocks.insert(0, block)
-
-            return block.ref("dns_suffix")
+    if pseudo_type not in pseduo_dispatch:
 
         raise ValueError(f"Unable to process pseudo var {pseudo_name}.")
 
-    block = pseduo_values[pseudo_type]
+    pseduo_resolver: Pseduo_Resolver = pseduo_dispatch[pseudo_type]
 
-    if block not in template.post_proccess_blocks:
-        template.post_proccess_blocks.insert(0, block)
-
-    return block.ref()
+    return pseduo_resolver(template)
 
 
 def wrap_in_curlys(input: str):

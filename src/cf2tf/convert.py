@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Type
 
 from thefuzz import process  # type: ignore
 
@@ -32,7 +32,10 @@ log = logging.getLogger("cf2tf")
 
 
 class TemplateConverter:
-    def __init__(self, cf_template: CFDict, search_manager: "SearchManager") -> None:
+    def __init__(
+        self, template_name: str, cf_template: CFDict, search_manager: "SearchManager"
+    ) -> None:
+        self.name = template_name
         self.cf_template = cf_template
         self.search_manager = search_manager
         self.terraform = config.Configuration([])
@@ -57,6 +60,17 @@ class TemplateConverter:
             return value.isoformat()
         else:
             return value
+
+    def add_post_block(self, block: Block):
+
+        if block not in self.post_proccess_blocks:
+            self.post_proccess_blocks.insert(0, block)
+
+    def get_block_by_type(self, block_type: Type[Block]):
+
+        for block in self.post_proccess_blocks:
+            if isinstance(block, block_type):
+                return block
 
     def convert(self) -> config.Configuration:
         # Should convert the given cloudformation template to a terraform configuration
@@ -251,12 +265,9 @@ class TemplateConverter:
             str_value = convert_map(value) if isinstance(value, dict) else str(value)
             map_value[key] = str_value
 
-        local_blocks = [
-            block for block in self.post_proccess_blocks if isinstance(block, Locals)
-        ]
+        local_block = self.get_block_by_type(Locals)
 
-        if local_blocks:
-            local_block = local_blocks[0]
+        if local_block:
             local_block.arguments.update(map_value)
             return []
 
