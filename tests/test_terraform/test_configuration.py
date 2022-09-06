@@ -7,7 +7,7 @@ def tc() -> TemplateConverter:
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
 
     tc.manifest = {section: [] for section in tc.valid_sections}
     return tc

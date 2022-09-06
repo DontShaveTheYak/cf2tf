@@ -13,7 +13,7 @@ def fake_tc() -> TemplateConverter:
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
 
     tc.manifest = {section: [] for section in tc.valid_sections}
     return tc
@@ -519,7 +519,7 @@ def test_ref(input, expected_result, expectation):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -560,7 +560,7 @@ def test_select(input, expected_result, expectation):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -604,7 +604,7 @@ def test_sub(input, expected_result, expectation, block):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -651,7 +651,7 @@ def test_sub_s(input, expected_result, expectation, block):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception
@@ -705,7 +705,7 @@ def test_sub_l(input, expected_result, expectation, block):
 
     sm = code.search_manager()
 
-    tc = TemplateConverter({}, sm)
+    tc = TemplateConverter("test", {}, sm)
     tc.manifest = cf_manifest
 
     # This is needed for tests that raise an exception

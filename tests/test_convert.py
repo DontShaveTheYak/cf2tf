@@ -13,7 +13,7 @@ def tc():
         code.search_manager()
     )  # todo We should not have to checkout the terraform source to run tests
 
-    tc = convert.TemplateConverter({}, sm)
+    tc = convert.TemplateConverter("test", {}, sm)
 
     return tc
 

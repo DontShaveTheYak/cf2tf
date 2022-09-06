@@ -41,7 +41,7 @@ def cli(output: Optional[str], template_path: str):
     search_manger = code.search_manager()
 
     # Turn Cloudformation template into a Terraform configuration
-    config = TemplateConverter(cf_template, search_manger).convert()
+    config = TemplateConverter(tmpl_path.stem, cf_template, search_manger).convert()
 
     # Save this configuration to disc
     config.save(output_writer)

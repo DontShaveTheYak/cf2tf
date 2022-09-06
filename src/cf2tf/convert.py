@@ -32,7 +32,10 @@ log = logging.getLogger("cf2tf")
 
 
 class TemplateConverter:
-    def __init__(self, cf_template: CFDict, search_manager: "SearchManager") -> None:
+    def __init__(
+        self, template_name: str, cf_template: CFDict, search_manager: "SearchManager"
+    ) -> None:
+        self.name = template_name
         self.cf_template = cf_template
         self.search_manager = search_manager
         self.terraform = config.Configuration([])
