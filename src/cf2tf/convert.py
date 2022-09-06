@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Type
 
 from thefuzz import process  # type: ignore
 
@@ -32,7 +32,10 @@ log = logging.getLogger("cf2tf")
 
 
 class TemplateConverter:
-    def __init__(self, cf_template: CFDict, search_manager: "SearchManager") -> None:
+    def __init__(
+        self, template_name: str, cf_template: CFDict, search_manager: "SearchManager"
+    ) -> None:
+        self.name = template_name
         self.cf_template = cf_template
         self.search_manager = search_manager
         self.terraform = config.Configuration([])
@@ -57,6 +60,17 @@ class TemplateConverter:
             return value.isoformat()
         else:
             return value
+
+    def add_post_block(self, block: Block):
+
+        if block not in self.post_proccess_blocks:
+            self.post_proccess_blocks.insert(0, block)
+
+    def get_block_by_type(self, block_type: Type[Block]):
+
+        for block in self.post_proccess_blocks:
+            if isinstance(block, block_type):
+                return block
 
     def convert(self) -> config.Configuration:
         # Should convert the given cloudformation template to a terraform configuration
@@ -129,6 +143,7 @@ class TemplateConverter:
         data: Any,
         allowed_func: functions.Dispatch,
         prev_func: Optional[str] = None,
+        inside_function=False,
     ) -> Any:
         """Recurses through a Cloudformation template. Solving all
         references and variables along the way.
@@ -151,22 +166,31 @@ class TemplateConverter:
                 if key == "Ref":
                     return functions.ref(self, value)
 
-                if "Fn::" not in key:
-                    data[key] = self.resolve_values(value, allowed_func, prev_func)
+                if "Fn::" not in key and not (
+                    key == "Condition" and inside_function is True
+                ):
+                    data[key] = self.resolve_values(
+                        value, allowed_func, prev_func, inside_function=inside_function
+                    )
                     continue
 
                 if key not in allowed_func:
                     raise ValueError(f"{key} not allowed to be nested in {prev_func}.")
 
                 value = self.resolve_values(
-                    value, functions.ALLOWED_FUNCTIONS[key], key
+                    value, functions.ALLOWED_FUNCTIONS[key], key, inside_function=True
                 )
 
                 return allowed_func[key](self, value)
 
             return data
         elif isinstance(data, list):
-            return [self.resolve_values(item, allowed_func, prev_func) for item in data]
+            return [
+                self.resolve_values(
+                    item, allowed_func, prev_func, inside_function=inside_function
+                )
+                for item in data
+            ]
         else:
 
             # todo What should we being doing with an integer? It shouldn't really be quoted?
@@ -200,13 +224,7 @@ class TemplateConverter:
                     converted_arguments["type"]
                 )
 
-            resolved_args = self.resolve_values(
-                converted_arguments, functions.ALL_FUNCTIONS
-            )
-
-            log.debug(f"Converted properties to {resolved_args}")
-
-            var = Variable(tf_name, resolved_args)
+            var = Variable(tf_name, converted_arguments)
 
             tf_vars.append(var)
 
@@ -247,12 +265,9 @@ class TemplateConverter:
             str_value = convert_map(value) if isinstance(value, dict) else str(value)
             map_value[key] = str_value
 
-        local_blocks = [
-            block for block in self.post_proccess_blocks if isinstance(block, Locals)
-        ]
+        local_block = self.get_block_by_type(Locals)
 
-        if local_blocks:
-            local_block = local_blocks[0]
+        if local_block:
             local_block.arguments.update(map_value)
             return []
 
