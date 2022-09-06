@@ -827,12 +827,25 @@ def url_suffix_pseduo(template: "TemplateConverter") -> str:
     return block.ref("dns_suffix")
 
 
+def stack_name_pseduo(template: "TemplateConverter") -> str:
+    local_block = template.get_block_by_type(hcl2.Locals)
+
+    if not local_block:
+        local_block = hcl2.Locals({})
+        template.add_post_block(local_block)
+
+    local_block.arguments["stack_name"] = template.name
+
+    return "local.stack_name"
+
+
 pseduo_dispatch: Pseduo_Dispatch = {
     "Region": region_pseduo,
     "AccountId": account_id_pseduo,
     "Partition": partition_pseduo,
     "NoValue": no_value_pseduo,
     "URLSuffix": url_suffix_pseduo,
+    "StackName": stack_name_pseduo,
 }
 
 

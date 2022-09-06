@@ -506,6 +506,7 @@ ref_tests = [
         "data.aws_partition.current.dns_suffix",
         no_exception(),
     ),
+    ("AWS::StackName", "local.stack_name", no_exception()),
 ]
 
 
