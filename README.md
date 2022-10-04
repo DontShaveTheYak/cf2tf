@@ -76,7 +76,7 @@
 
 ### Prerequisites
 
-Cloud-Radar requires python >= 3.7
+Cloudformation 2 Terraform requires python >= 3.7
 
 ### Installation
 
