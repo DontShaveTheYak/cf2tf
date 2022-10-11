@@ -11,6 +11,7 @@
 [![Tests][test-shield]][test-url]
 [![Coverage][codecov-shield]][codecov-url]
 [![License][license-shield]][license-url]
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FDontShaveTheYak%2Fcf2tf.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FDontShaveTheYak%2Fcf2tf?ref=badge_shield)
 <!-- [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
@@ -65,6 +66,9 @@
     <li><a href="#acknowledgements">Acknowledgements</a></li>
   </ol>
 </details>
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FDontShaveTheYak%2Fcf2tf.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FDontShaveTheYak%2Fcf2tf?ref=badge_large)
 
 ## About The Project
 
