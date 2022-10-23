@@ -91,9 +91,9 @@ class TemplateConverter:
 
     def parse_template(self):
 
-        for section in self.valid_sections:
+        for section in self.cf_template:
 
-            if section not in self.cf_template:
+            if section not in self.valid_sections:
                 log.debug(
                     f"Ignoring section {section} not found in {self.valid_sections}"
                 )
