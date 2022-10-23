@@ -106,7 +106,6 @@ class CloneProgress(RemoteProgress):
 
 
 def transform_file_name(og_name: str):
-    log.debug(f"Tranforming {og_name} for search.")
 
     no_extensions = og_name.split(".")[0]
 
