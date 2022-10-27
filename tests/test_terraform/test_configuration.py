@@ -1,4 +1,5 @@
 import pytest
+
 from cf2tf.convert import TemplateConverter
 from cf2tf.terraform import code
 
@@ -15,9 +16,9 @@ def tc() -> TemplateConverter:
 
 resolve_values_tests = [
     # (input, expected_result, tc)
-    ("A", '"A"', tc()),
-    (["A", "B", "C"], ['"A"', '"B"', '"C"'], tc()),
-    ({"Foo": "Bar"}, {"Foo": '"Bar"'}, tc()),
+    ("A", "A", tc()),
+    (["A", "B", "C"], ["A", "B", "C"], tc()),
+    ({"Foo": "Bar"}, {"Foo": "Bar"}, tc()),
 ]
 
 
