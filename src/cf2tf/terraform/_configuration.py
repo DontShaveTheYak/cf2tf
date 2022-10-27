@@ -4,7 +4,7 @@ import logging
 from typing import List
 
 from cf2tf.save import Output
-from cf2tf.terraform.hcl2 import Block
+from cf2tf.terraform.blocks import Block
 
 log = logging.getLogger("cf2tf")
 
