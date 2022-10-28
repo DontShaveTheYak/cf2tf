@@ -513,6 +513,22 @@ def test_ref(input, expected_result, expectation):
         assert result == expected_result
 
 
+def test_ref_conditional():
+
+    cf_manifest = {
+        "Parameters": [("foo", {"a": "a"})],
+        "Resources": [("bar", {"Type": "AWS::S3::Bucket", "Condition": "Foo"})],
+    }
+
+    sm = code.search_manager()
+
+    tc = TemplateConverter("test", {}, sm)
+    tc.manifest = cf_manifest
+
+    result = expressions.ref(tc, "bar")
+    assert result == "aws_s3_bucket.bar[0].id"
+
+
 select_tests = [
     # (input, expected_result, expectation, block)
     ({}, None, pytest.raises(TypeError)),

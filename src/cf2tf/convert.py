@@ -286,14 +286,14 @@ class TemplateConverter:
 
         tf_resources: List[Resource] = []
 
-        for resource_id, resource_props in resources:
+        for resource_id, resource_values in resources:
 
             log.debug(f"Converting Cloudformation resource {resource_id} to Terraform.")
 
             tf_name = pascal_to_snake(resource_id)
             log.debug(f"Converted name to {tf_name}")
 
-            resource_type = resource_props.get("Type")
+            resource_type = resource_values.get("Type")
 
             if not resource_type:
                 raise Exception("Type is required")
@@ -304,7 +304,7 @@ class TemplateConverter:
 
             tf_type = create_resource_type(docs_path)
 
-            log.debug(f"Converted type from {resource_props.get('Type')} to {tf_type}")
+            log.debug(f"Converted type from {resource_values.get('Type')} to {tf_type}")
 
             valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
 
@@ -316,34 +316,31 @@ class TemplateConverter:
                 f"Parsed the following attributes from the documentation: \n{valid_attributes}"
             )
 
-            properties = resource_props.get("Properties")
+            properties = resource_values.get("Properties", {})
 
-            if properties is None:
-                resource = Resource(
-                    tf_name, tf_type, {}, valid_arguments, valid_attributes
+            arguments = MapType(properties)
+
+            if properties:
+
+                log.debug(
+                    "Converting the intrinsic functions to Terraform expressions..."
                 )
-                tf_resources.append(resource)
-                continue
 
-            log.debug("Converting the intrinsic functions to Terraform expressions...")
+                resolved_values = self.resolve_values(
+                    properties, functions.ALL_FUNCTIONS
+                )
 
-            resolved_values = self.resolve_values(properties, functions.ALL_FUNCTIONS)
+                log.debug("Converting property names to argument names...")
 
-            # print(repr(resolved_values))
+                arguments = props_to_args(resolved_values, valid_arguments, docs_path)
 
-            # for key, value in resolved_values.items():
-            #     print(f"Key {key} has type {type(value)}")
-            # sys.exit(0)
+                log.debug(f"Converted properties to {arguments}")
 
-            log.debug("Converting property names to argument names...")
+            conditional = resource_values.get("Condition")
 
-            arguments = props_to_args(resolved_values, valid_arguments, docs_path)
-
-            log.debug(f"Converted properties to {arguments}")
-
-            # for key, value in resolved_values.items():
-            #     print(f"Key {key} has type {type(value)}")
-            # sys.exit(0)
+            if conditional is not None:
+                condition_map = {"count": LiteralType(f"locals.{conditional} ? 1 : 0")}
+                arguments = MapType({**condition_map, **arguments})
 
             resource = Resource(
                 tf_name, tf_type, arguments, valid_arguments, valid_attributes
