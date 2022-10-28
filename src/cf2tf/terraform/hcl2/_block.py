@@ -50,10 +50,16 @@ class Block:
         return self.render()
 
     def ref(self, attribute_name: Optional[str] = None):
-        if not attribute_name:
-            return LiteralType(f"{self.base_ref()}.{self.valid_attributes[0]}")
 
-        return LiteralType(f"{self.base_ref()}.{attribute_name}")
+        count = "[0]" if "count" in self.arguments else ""
+
+        resource_name = f"{self.base_ref()}{count}"
+
+        attribute = (
+            self.valid_attributes[0] if attribute_name is None else attribute_name
+        )
+
+        return LiteralType(f"{resource_name}.{attribute}")
 
     def render(self, indent=0):
 

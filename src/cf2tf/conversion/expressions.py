@@ -796,6 +796,11 @@ def ref(template: "TemplateConverter", var_name: str):
         tf_name = cf2tf.convert.pascal_to_snake(var_name)
         tf_type = cf2tf.convert.create_resource_type(docs_path)
         first_attr = next(iter(valid_attributes))
+        conditional = cf_resource.get("Condition")
+
+        if conditional is not None:
+            tf_name = f"{tf_name}[0]"
+
         return LiteralType(f"{tf_type}.{tf_name}.{first_attr}")
 
     raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
