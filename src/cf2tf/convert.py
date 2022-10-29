@@ -10,11 +10,12 @@ from thefuzz import process  # type: ignore
 import cf2tf.conversion.expressions as functions
 import cf2tf.terraform._configuration as config
 import cf2tf.terraform.doc_file as doc_file
+from cf2tf.conversion.overrides import OVERRIDE_DISPATCH
 from cf2tf.terraform.blocks import Block, Locals, Output, Resource, Variable
 from cf2tf.terraform.hcl2 import AllTypes
 from cf2tf.terraform.hcl2.complex import ListType, MapType
 from cf2tf.terraform.hcl2.custom import CommentType, LiteralType
-from cf2tf.terraform.hcl2.primitive import NumberType, StringType
+from cf2tf.terraform.hcl2.primitive import NumberType, StringType, TerraformType
 
 if TYPE_CHECKING:
     from cf2tf.terraform.code import SearchManager
@@ -23,9 +24,10 @@ if TYPE_CHECKING:
 # Wish I could go back to this style of import but getting cycle error
 # from cf2tf.terraform import doc_file, Configuration
 
-
+ResourceName = str
+ResourceValues = Dict[str, Any]
 Template = Dict[str, Any]
-CFResource = Tuple[str, Dict[str, Any]]
+CFResource = Tuple[ResourceName, ResourceValues]
 CFResources = List[CFResource]
 Manifest = Dict[str, CFResources]
 
@@ -316,7 +318,7 @@ class TemplateConverter:
                 f"Parsed the following attributes from the documentation: \n{valid_attributes}"
             )
 
-            properties = resource_values.get("Properties", {})
+            properties: Dict[str, Any] = resource_values.get("Properties", {})
 
             arguments = MapType(properties)
 
@@ -330,9 +332,15 @@ class TemplateConverter:
                     properties, functions.ALL_FUNCTIONS
                 )
 
+                log.debug("Overiding Properties")
+
+                overrided_values = perform_resource_overrides(
+                    tf_type, resolved_values, self
+                )
+
                 log.debug("Converting property names to argument names...")
 
-                arguments = props_to_args(resolved_values, valid_arguments, docs_path)
+                arguments = props_to_args(overrided_values, valid_arguments, docs_path)
 
                 log.debug(f"Converted properties to {arguments}")
 
@@ -443,7 +451,7 @@ def camel_case_split(text: str) -> str:
 
     items = re.findall(r"[A-Z\d](?:[a-z]+|\d|[A-Z]*(?=[A-Z]|$))", text)
 
-    return " ".join(items)
+    return " ".join(items) if items else text
 
 
 def create_resource_type(doc_path: Path):
@@ -597,3 +605,21 @@ def convert_parameter_type(param_type: str):
 def add_space():
     if log.level == logging.DEBUG:
         print()
+
+
+def perform_resource_overrides(
+    tf_type: str, params: Dict[str, TerraformType], tc: TemplateConverter
+):
+
+    log.debug("Overiding params for {tf_type}")
+    if tf_type not in OVERRIDE_DISPATCH:
+        return params
+
+    param_overrides = OVERRIDE_DISPATCH[tf_type]
+
+    for param, override in param_overrides.items():
+
+        if param in params:
+            params = override(tc, params)
+
+    return params
