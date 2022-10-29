@@ -7,6 +7,7 @@ import pytest
 import cf2tf.convert as convert
 from cf2tf.terraform import code, doc_file
 from cf2tf.terraform.blocks import Data, Locals, Output
+from cf2tf.terraform.hcl2.primitive import StringType
 
 
 def tc():
@@ -133,3 +134,24 @@ def test_get_block_by_type():
     block = template.get_block_by_type(Output)
 
     assert block is None
+
+
+def test_perform_resource_overrides():
+
+    template = tc()
+
+    fake_params = {"foo": StringType("bar")}
+
+    result = convert.perform_resource_overrides("fake_resource", fake_params, template)
+
+    assert result is fake_params
+
+    params = {"AccessControl": StringType("Private")}
+
+    result = convert.perform_resource_overrides("aws_s3_bucket", params, tc)
+
+    assert result is params
+
+    assert "AccessControl" not in result
+    assert "acl" in result
+    assert "private" == result["acl"]
