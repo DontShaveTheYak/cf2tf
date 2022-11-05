@@ -634,6 +634,12 @@ sub_s_tests = [
         no_exception(),
         hcl2.Resource("bar", "foo", {}, [], ["bazz"]),
     ),
+    (
+        "some ${bar.arn}",
+        "some ${aws_s3_bucket.bar.arn}",
+        no_exception(),
+        hcl2.Resource("bar", "foo", {}, [], ["bazz"]),
+    ),
 ]
 
 

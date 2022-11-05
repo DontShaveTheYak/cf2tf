@@ -686,7 +686,8 @@ def sub_s(template: "TemplateConverter", value: str):
     def replace_var(m):
         var = m.group(1)
 
-        result = ref(template, var)
+        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
+
         return wrap_in_curlys(result)
 
     reVar = r"(?!\$\{\!)\$\{(\w+[^}]*)\}"
@@ -733,13 +734,13 @@ def sub_l(template: "TemplateConverter", values: List):
         )
 
     def replace_var(m):
-        var = m.group(2)
+        var: str = m.group(2)
 
         if var in local_vars:
             result = local_vars[var]
             return wrap_in_curlys(result)
 
-        result = ref(template, var)
+        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
 
         return wrap_in_curlys(result)
 
