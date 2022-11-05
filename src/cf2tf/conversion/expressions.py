@@ -539,9 +539,9 @@ def join(_tc: "TemplateConverter", values: Any):
         )
 
     if isinstance(items, str):
-        return LiteralType(f'join("{delimiter}", {items})')
+        return LiteralType(f"join({delimiter}, {items})")
 
-    return LiteralType(f'join("{delimiter}", {_terraform_list(items)})')
+    return LiteralType(f"join({delimiter}, {_terraform_list(items)})")
 
 
 # todo I'm not sure this is that useful

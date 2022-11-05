@@ -43,10 +43,7 @@ class StringType(str, TerraformType):
 
     def render(self, _=0):
 
-        if self.value:
-            return f'"{self.value}"'
-
-        return ""
+        return f'"{self.value}"'
 
 
 class NumberType(int, TerraformType):

@@ -428,12 +428,12 @@ def test_get_azs(fake_tc: TemplateConverter):
 
 
 join_tests = [
-    (None, ["-", "var.something"], 'join("-", var.something)'),
-    (None, ["-", ["A", "B", "C"]], 'join("-", [A, B, C])'),
-    (None, ["-", ["A", "var.thing", "C"]], 'join("-", [A, var.thing, C])'),
+    (None, ['"-"', "var.something"], 'join("-", var.something)'),
+    (None, ['"-"', ["A", "B", "C"]], 'join("-", [A, B, C])'),
+    (None, ['"-"', ["A", "var.thing", "C"]], 'join("-", [A, var.thing, C])'),
     (
         None,
-        ["-", ["A", "aws_resource.name.attr", "C"]],
+        ['"-"', ["A", "aws_resource.name.attr", "C"]],
         'join("-", [A, aws_resource.name.attr, C])',
     ),
 ]
