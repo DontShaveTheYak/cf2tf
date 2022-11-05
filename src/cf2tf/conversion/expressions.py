@@ -8,19 +8,24 @@ import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 import cf2tf.convert
+import cf2tf.terraform.blocks as hcl2
 import cf2tf.terraform.doc_file as doc_file
-import cf2tf.terraform.hcl2 as hcl2
+from cf2tf.terraform.hcl2.custom import LiteralType
+from cf2tf.terraform.hcl2.primitive import NullType, StringType, TerraformType
 
 if TYPE_CHECKING:
     from cf2tf.convert import TemplateConverter
 
 log = logging.getLogger("cf2tf")
 
-Dispatch = Dict[str, Callable[..., Any]]
+Instrinsic_Converter = Callable[["TemplateConverter", Any], TerraformType]
 
-Pseduo_Resolver = Callable[["TemplateConverter"], str]
+Pseduo_Resolver = Callable[["TemplateConverter"], TerraformType]
 
 Pseduo_Dispatch = Dict[str, Pseduo_Resolver]
+
+Dispatch = Dict[str, Instrinsic_Converter]
+
 
 # todo Most of these exceptions are very similar
 # either we expect a certain type and didnt get it.
@@ -47,8 +52,7 @@ def base64(_tc: "TemplateConverter", value: Any):
             f"Fn::Base64 - The value must be a String, not {type(value).__name__}."
         )
 
-    value = value.strip('"')
-    return f"base64encode({value})"
+    return LiteralType(f"base64encode({value})")
 
 
 def cidr(_tc: "TemplateConverter", values: Any):
@@ -79,7 +83,7 @@ def cidr(_tc: "TemplateConverter", values: Any):
             )
         )
 
-    ip_block: str = values[0].strip('"')
+    ip_block: str = values[0]
     count = int(values[1])
     hostBits = int(values[2])
 
@@ -89,7 +93,9 @@ def cidr(_tc: "TemplateConverter", values: Any):
 
     newbits = mask - int(netmask)
 
-    return f'cidrsubnets("{ip_block}", {", ".join([str(newbits)] * count)})'
+    return LiteralType(
+        f'cidrsubnets("{ip_block}", {", ".join([str(newbits)] * count)})'
+    )
 
 
 def and_(_tc: "TemplateConverter", values: Any):
@@ -117,7 +123,7 @@ def and_(_tc: "TemplateConverter", values: Any):
     if len_ < 2 or len_ > 10:
         raise ValueError("Fn::And - The values must have between 2 and 10 conditions.")
 
-    return f"alltrue({values})"
+    return LiteralType(f"alltrue({values})")
 
 
 def equals(_tc: "TemplateConverter", values: Any):
@@ -143,7 +149,7 @@ def equals(_tc: "TemplateConverter", values: Any):
     if not len(values) == 2:
         raise ValueError("Fn::Equals - The values must contain two values to compare.")
 
-    return f"{values[0]} == {values[1]}"
+    return LiteralType(f"{values[0]} == {values[1]}")
 
 
 def if_(_tc: "TemplateConverter", values: Any):
@@ -185,7 +191,7 @@ def if_(_tc: "TemplateConverter", values: Any):
 
     condition = condition.strip('"')
 
-    return f"local.{condition} ? {values[1]} : {values[2]}"
+    return LiteralType(f"local.{condition} ? {values[1]} : {values[2]}")
 
 
 def not_(_tc: "TemplateConverter", values: Any):
@@ -214,7 +220,7 @@ def not_(_tc: "TemplateConverter", values: Any):
     condition: Any = values[0]
 
     # todo This needs fixed because python True needs to be terraform true
-    return f"!{condition}"
+    return LiteralType(f"!{condition}")
 
 
 def or_(_tc: "TemplateConverter", values: Any):
@@ -248,7 +254,7 @@ def or_(_tc: "TemplateConverter", values: Any):
 
     values = _terraform_list(values)
 
-    return f"anytrue({values})"
+    return LiteralType(f"anytrue({values})")
 
 
 def condition(template: "TemplateConverter", name: Any):
@@ -270,14 +276,16 @@ def condition(template: "TemplateConverter", name: Any):
             f"Fn::Condition - The value must be a String, not {type(name).__name__}."
         )
 
+    # This is a side effect of how we handle StringType
     name = name.strip('"')
+
     # todo We could check if condition is a key in the local args
     # if name not in template.template["Conditions"]:
     #     raise KeyError(
     #         f"Fn::Condition - Unable to find condition '{name}' in template."
     #     )
 
-    return f"local.{name}"
+    return LiteralType(f"local.{name}")
 
 
 def find_in_map(template: "TemplateConverter", values: Any):
@@ -339,7 +347,7 @@ def find_in_map(template: "TemplateConverter", values: Any):
 
     # Checking if the keys are valid doesn't work if the keys were intrinsic functions/vars
 
-    return f"local.mappings[{map_name}][{top_key}][{second_key}]"
+    return LiteralType(f"local.mappings[{map_name}][{top_key}][{second_key}]")
 
 
 def get_att(template: "TemplateConverter", values: Any):
@@ -359,11 +367,10 @@ def get_att(template: "TemplateConverter", values: Any):
         str: Terraform equivalent expression.
     """
 
-    if not isinstance(values, list):
+    if not isinstance(values, List):
         raise TypeError(
             f"Fn::GetAtt - The values must be a List, not {type(values).__name__}."
         )
-
     if not len(values) == 2:
         raise ValueError(
             (
@@ -380,8 +387,6 @@ def get_att(template: "TemplateConverter", values: Any):
             "Fn::GetAtt - logicalNameOfResource and attributeName must be String."
         )
 
-    cf_name = cf_name.strip('"')
-    cf_property = cf_property.strip('"')
     nested_prop: Optional[List[str]] = None
 
     if "." in cf_property:
@@ -422,7 +427,7 @@ def get_att(template: "TemplateConverter", values: Any):
         )
         return nested_attr(tf_name, tf_type, prop, attribute_name)
 
-    return f"{tf_type}.{tf_name}.{attribute_name}"
+    return LiteralType(f"{tf_type}.{tf_name}.{attribute_name}")
 
 
 def nested_attr(tf_name: str, tf_type: str, cf_prop: str, tf_attr: str):
@@ -441,7 +446,7 @@ def get_attr_nested_stack(tf_name: str, tf_type: str, cf_property, tf_attr):
 
     _, stack_output_name = items
 
-    return f"{tf_type}.{tf_name}.{tf_attr}.{stack_output_name}"
+    return LiteralType(f"{tf_type}.{tf_name}.{tf_attr}.{stack_output_name}")
 
 
 def get_azs(template: "TemplateConverter", region: Any):
@@ -466,17 +471,19 @@ def get_azs(template: "TemplateConverter", region: Any):
             f"Fn::GetAZs - The region must be a String, not {type(region).__name__}."
         )
 
-    region = region.strip('"')
+    region = region
 
     data = [
         data for data in template.post_proccess_blocks if isinstance(data, hcl2.Data)
     ]
 
     if not data:
-        az_data = hcl2.Data("available", "availability_zones", {"state": "available"})
+        az_data = hcl2.Data(
+            "available", "availability_zones", {"state": StringType("available")}
+        )
         template.post_proccess_blocks.insert(0, az_data)
 
-    return "data.aws_availability_zones.available.names"
+    return LiteralType("data.aws_availability_zones.available.names")
 
 
 # todo Handle functions that are not applicable to terraform.
@@ -524,7 +531,7 @@ def join(_tc: "TemplateConverter", values: Any):
     items: Union[List[Any], str]
 
     if isinstance(values[0], str) and isinstance(values[1], (list, str)):
-        delimiter = values[0].strip('"')
+        delimiter = values[0]
         items = values[1]
     else:
         raise TypeError(
@@ -532,16 +539,16 @@ def join(_tc: "TemplateConverter", values: Any):
         )
 
     if isinstance(items, str):
-        return f'join("{delimiter}", {items})'
+        return LiteralType(f"join({delimiter}, {items})")
 
-    return f'join("{delimiter}", {_terraform_list(items)})'
+    return LiteralType(f"join({delimiter}, {_terraform_list(items)})")
 
 
 # todo I'm not sure this is that useful
 def _terraform_list(items: List[Any]):
 
-    # Not sure why I ever did this :thinkingface:
-    # items = [item for item in items]
+    # .join() doesn't call `_str_` on items
+    items = [str(item) for item in items]
 
     return f"[{', '.join(items)}]"
 
@@ -576,21 +583,23 @@ def select(_tc: "TemplateConverter", values: Any):
             )
         )
 
-    index: int = values[0] if isinstance(values[0], int) else int(values[0].strip('"'))
+    index: int = values[0] if isinstance(values[0], int) else int(values[0])
     items: Union[List[Any], str] = values[1]
 
     if not isinstance(index, int) or not isinstance(items, (list, str)):
+        log.error(f"Index is type {type(index)} with value {index}")
+        log.error(f"Items is type {type(items)} with value {items}")
         raise TypeError(
             "Fn::Select - The first value must be a Number and the second a List or String."
         )
 
     if isinstance(items, str):
-        items = items.strip('"')
+        items = items
     else:
         items = _terraform_list(items)
 
     try:
-        return f"element({items}, {index})"
+        return LiteralType(f"element({items}, {index})")
     except IndexError:
         raise IndexError("Fn::Select - List size is smaller than the Index given.")
 
@@ -628,14 +637,14 @@ def split(_tc: "TemplateConverter", values: Any):
     source_string: str
 
     if isinstance(values[0], str) and isinstance(values[1], str):
-        delimiter = values[0].strip('"')
+        delimiter = values[0]
         source_string = values[1]
     else:
         raise TypeError(
             "Fn::Split-- The first value must be a String and the second a String."
         )
 
-    return f'split("{delimiter}", {source_string})'
+    return LiteralType(f'split("{delimiter}", {source_string})')
 
 
 def sub(template: "TemplateConverter", values: Any):
@@ -677,15 +686,16 @@ def sub_s(template: "TemplateConverter", value: str):
     def replace_var(m):
         var = m.group(1)
 
-        result = ref(template, var)
+        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
+
         return wrap_in_curlys(result)
 
     reVar = r"(?!\$\{\!)\$\{(\w+[^}]*)\}"
 
     if re.search(reVar, value):
-        return re.sub(reVar, replace_var, value).replace("${!", "${")
+        return StringType(re.sub(reVar, replace_var, value).replace("${!", "${"))
 
-    return value.replace("${!", "${")
+    return StringType(value.replace("${!", "${"))
 
 
 # todo This needs to create local variables in the template.
@@ -724,22 +734,24 @@ def sub_l(template: "TemplateConverter", values: List):
         )
 
     def replace_var(m):
-        var = m.group(2)
+        var: str = m.group(2)
 
         if var in local_vars:
             result = local_vars[var]
             return wrap_in_curlys(result)
 
-        result = ref(template, var)
+        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
 
         return wrap_in_curlys(result)
 
     reVar = r"(?!\$\{\!)\$(\w+|\{([^}]*)\})"
 
     if re.search(reVar, source_string):
-        return re.sub(reVar, replace_var, source_string).replace("${!", "${")
+        return StringType(
+            re.sub(reVar, replace_var, source_string).replace("${!", "${")
+        )
 
-    return source_string.replace("${!", "${")
+    return StringType(source_string.replace("${!", "${"))
 
 
 # todo Transform is an AWS native capability with no Terraform equivalent expression.
@@ -774,7 +786,7 @@ def ref(template: "TemplateConverter", var_name: str):
 
     if cf_param:
         tf_name = cf2tf.convert.pascal_to_snake(var_name)
-        return f"var.{tf_name}"
+        return LiteralType(f"var.{tf_name}")
 
     cf_resource = template.resource_lookup(var_name, ["Resources"])
 
@@ -785,12 +797,17 @@ def ref(template: "TemplateConverter", var_name: str):
         tf_name = cf2tf.convert.pascal_to_snake(var_name)
         tf_type = cf2tf.convert.create_resource_type(docs_path)
         first_attr = next(iter(valid_attributes))
-        return f"{tf_type}.{tf_name}.{first_attr}"
+        conditional = cf_resource.get("Condition")
+
+        if conditional is not None:
+            tf_name = f"{tf_name}[0]"
+
+        return LiteralType(f"{tf_type}.{tf_name}.{first_attr}")
 
     raise ValueError(f"Fn::Ref - {var_name} is not a valid Resource or Parameter.")
 
 
-def region_pseduo(template: "TemplateConverter") -> str:
+def region_pseduo(template: "TemplateConverter"):
     block = hcl2.Data("current", "aws_region", valid_attributes=["name"])
 
     template.add_post_block(block)
@@ -798,7 +815,7 @@ def region_pseduo(template: "TemplateConverter") -> str:
     return block.ref()
 
 
-def account_id_pseduo(template: "TemplateConverter") -> str:
+def account_id_pseduo(template: "TemplateConverter"):
     block = hcl2.Data("current", "aws_caller_identity", valid_attributes=["account_id"])
 
     template.add_post_block(block)
@@ -806,7 +823,7 @@ def account_id_pseduo(template: "TemplateConverter") -> str:
     return block.ref()
 
 
-def partition_pseduo(template: "TemplateConverter") -> str:
+def partition_pseduo(template: "TemplateConverter"):
     block = hcl2.Data("current", "aws_partition", valid_attributes=["partition"])
 
     template.add_post_block(block)
@@ -814,12 +831,12 @@ def partition_pseduo(template: "TemplateConverter") -> str:
     return block.ref()
 
 
-def no_value_pseduo(_: "TemplateConverter") -> str:
+def no_value_pseduo(_: "TemplateConverter"):
 
-    return "null"
+    return NullType()
 
 
-def url_suffix_pseduo(template: "TemplateConverter") -> str:
+def url_suffix_pseduo(template: "TemplateConverter"):
     block = hcl2.Data("current", "aws_partition", valid_attributes=["partition"])
 
     template.add_post_block(block)
@@ -827,7 +844,7 @@ def url_suffix_pseduo(template: "TemplateConverter") -> str:
     return block.ref("dns_suffix")
 
 
-def stack_name_pseduo(template: "TemplateConverter") -> str:
+def stack_name_pseduo(template: "TemplateConverter"):
     local_block = template.get_block_by_type(hcl2.Locals)
 
     if not local_block:
@@ -836,19 +853,19 @@ def stack_name_pseduo(template: "TemplateConverter") -> str:
 
     local_block.arguments["stack_name"] = template.name
 
-    return "local.stack_name"
+    return LiteralType("local.stack_name")
 
 
-def stack_id_pseduo(template: "TemplateConverter") -> str:
+def stack_id_pseduo(template: "TemplateConverter"):
     local_block = template.get_block_by_type(hcl2.Locals)
 
     if not local_block:
         local_block = hcl2.Locals({})
         template.add_post_block(local_block)
 
-    local_block.arguments["stack_id"] = f'uuidv5("dns", "{template.name}")'
+    local_block.arguments["stack_id"] = LiteralType(f'uuidv5("dns", "{template.name}")')
 
-    return "local.stack_id"
+    return LiteralType("local.stack_id")
 
 
 pseduo_dispatch: Pseduo_Dispatch = {
@@ -862,7 +879,7 @@ pseduo_dispatch: Pseduo_Dispatch = {
 }
 
 
-def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str) -> str:
+def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str):
 
     pseudo_type = pseudo_name.replace("AWS::", "")
 

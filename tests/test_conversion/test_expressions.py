@@ -1,11 +1,13 @@
 from contextlib import nullcontext as no_exception
 from typing import Any, List
 
-import cf2tf.terraform.code as code
-import cf2tf.terraform.hcl2 as hcl2
 import pytest
+
+import cf2tf.terraform.blocks as hcl2
+import cf2tf.terraform.code as code
 from cf2tf.conversion import expressions
 from cf2tf.convert import TemplateConverter
+from cf2tf.terraform.hcl2.primitive import StringType
 
 
 @pytest.fixture(scope="session")
@@ -27,14 +29,10 @@ base64_tests = [
         "base64encode(var.something)",
         no_exception(),
     ),
-    pytest.param(
-        "something",
+    (
+        StringType("something"),
         'base64encode("something")',
         no_exception(),
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="Conversion from python datatypes to terraform argument values needed",
-        ),
     ),
 ]
 
@@ -92,15 +90,6 @@ and_tests = [
         "alltrue([0, 1])",
         no_exception(),
     ),
-    pytest.param(
-        ["var.a", "true"],
-        'alltrue([var.a, "true"])',
-        no_exception(),
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="Conversion from python datatypes to terraform argument values needed",
-        ),
-    ),
 ]
 
 
@@ -129,14 +118,10 @@ equals_tests = [
         "var.a == var.b",
         no_exception(),
     ),
-    pytest.param(
-        ["var.a", "something"],
+    (
+        ["var.a", StringType("something")],
         'var.a == "something"',
         no_exception(),
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="Conversion from python datatypes to terraform argument values needed",
-        ),
     ),
 ]
 
@@ -167,14 +152,10 @@ if_tests = [
         "local.something ? var.a : var.b",
         no_exception(),
     ),
-    pytest.param(
-        ["something", "a", "b"],
+    (
+        ["something", StringType("a"), StringType("b")],
         'local.something ? "a" : "b"',
         no_exception(),
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="Conversion from python datatypes to terraform argument values needed",
-        ),
     ),
 ]
 
@@ -227,7 +208,7 @@ def test_not(input, expected_result, expectation):
     assert result == expected_result
 
 
-# a tuple with a value for each parameter in the test function
+# todo fix boolean values
 or_tests = [
     # (input, expected_result, expectation)
     ({}, None, pytest.raises(TypeError)),
@@ -443,16 +424,16 @@ def test_get_azs(fake_tc: TemplateConverter):
     ]
 
     # Make sure the datasource was added correctly
-    assert len(data_blocks) != 0 and data_blocks[0].name == "available"
+    assert len(data_blocks) != 0 and data_blocks[0].name == '"available"'
 
 
 join_tests = [
-    (None, ["-", "var.something"], 'join("-", var.something)'),
-    (None, ["-", ["A", "B", "C"]], 'join("-", [A, B, C])'),
-    (None, ["-", ["A", "var.thing", "C"]], 'join("-", [A, var.thing, C])'),
+    (None, ['"-"', "var.something"], 'join("-", var.something)'),
+    (None, ['"-"', ["A", "B", "C"]], 'join("-", [A, B, C])'),
+    (None, ['"-"', ["A", "var.thing", "C"]], 'join("-", [A, var.thing, C])'),
     (
         None,
-        ["-", ["A", "aws_resource.name.attr", "C"]],
+        ['"-"', ["A", "aws_resource.name.attr", "C"]],
         'join("-", [A, aws_resource.name.attr, C])',
     ),
 ]
@@ -529,8 +510,23 @@ def test_ref(input, expected_result, expectation):
 
     with expectation:
         result = expressions.ref(tc, input)
+        assert result == expected_result
 
-    assert result == expected_result
+
+def test_ref_conditional():
+
+    cf_manifest = {
+        "Parameters": [("foo", {"a": "a"})],
+        "Resources": [("bar", {"Type": "AWS::S3::Bucket", "Condition": "Foo"})],
+    }
+
+    sm = code.search_manager()
+
+    tc = TemplateConverter("test", {}, sm)
+    tc.manifest = cf_manifest
+
+    result = expressions.ref(tc, "bar")
+    assert result == "aws_s3_bucket.bar[0].id"
 
 
 select_tests = [
@@ -545,7 +541,7 @@ select_tests = [
         no_exception(),
     ),
     (
-        ['"0"', ['"A"', '"B"', '"C"']],
+        ["0", ['"A"', '"B"', '"C"']],
         'element(["A", "B", "C"], 0)',
         no_exception(),
     ),
@@ -615,8 +611,6 @@ def test_sub(input, expected_result, expectation, block):
     with expectation:
         result = expressions.sub_s(tc, input)
 
-    print(result)
-
     assert result == expected_result
 
 
@@ -637,6 +631,12 @@ sub_s_tests = [
     (
         "some ${bar}",
         "some ${aws_s3_bucket.bar.id}",
+        no_exception(),
+        hcl2.Resource("bar", "foo", {}, [], ["bazz"]),
+    ),
+    (
+        "some ${bar.arn}",
+        "some ${aws_s3_bucket.bar.arn}",
         no_exception(),
         hcl2.Resource("bar", "foo", {}, [], ["bazz"]),
     ),
@@ -662,11 +662,10 @@ def test_sub_s(input, expected_result, expectation, block):
     with expectation:
         result = expressions.sub_s(tc, input)
 
-    print(result)
-
     assert result == expected_result
 
 
+# todo Fix this case where string is broken
 sub_l_tests = [
     # (input, expected_result, expectation, block)
     ([None], None, pytest.raises(ValueError), None),

@@ -11,7 +11,7 @@ except ImportError:
     # Python 3.6 and 3.7
     from typing_extensions import Protocol  # type: ignore
 
-import cf2tf.terraform.hcl2 as hlc2
+import cf2tf.terraform.blocks as hlc2
 
 log = logging.getLogger("cf2tf")
 
@@ -63,9 +63,9 @@ class Directory:
 
         with file_path.open("w", encoding="utf-8") as f:
             for block in blocks:
-                contents = block.write()
+                contents = str(block)
                 f.write(contents)
-                f.write("\n")
+                f.write("\n\n")
 
 
 class StdOut:
@@ -79,7 +79,7 @@ class StdOut:
         for resource in resources:
             try:
                 print()
-                print(resource.write())
+                print(resource)
             except Exception as e:
                 print(f"Unable to write {'.'.join(resource.labels)}")
                 raise e

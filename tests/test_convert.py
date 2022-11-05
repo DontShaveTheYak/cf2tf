@@ -2,10 +2,12 @@ from contextlib import nullcontext as no_exception
 from pathlib import Path
 from typing import Any, Dict
 
-import cf2tf.convert as convert
 import pytest
+
+import cf2tf.convert as convert
 from cf2tf.terraform import code, doc_file
-from cf2tf.terraform.hcl2 import Data, Locals, Output
+from cf2tf.terraform.blocks import Data, Locals, Output
+from cf2tf.terraform.hcl2.primitive import StringType
 
 
 def tc():
@@ -42,28 +44,7 @@ def test_props_to_args(
 
     converted_args = convert.props_to_args(props, valid_arguments, docs_path)
 
-    assert converted_args == expected_args
-
-
-convert_map_tests = [
-    # (input, expected_result)
-    (
-        {"foo": '"bar"'},
-        '{\n  foo = "bar"\n}',
-    ),
-    (
-        {"foo": {"bar": '"baz"'}},
-        '{\n  foo = {\n    bar = "baz"\n  }\n}',
-    ),
-]
-
-
-@pytest.mark.parametrize("input, expected_result", convert_map_tests)
-def test_convert_map(input: Dict[str, Any], expected_result: str):
-
-    actual_result = convert.convert_map(input, 0)
-
-    assert actual_result == expected_result
+    assert converted_args.keys() == expected_args.keys()
 
 
 camel_case_tests = [
@@ -153,3 +134,24 @@ def test_get_block_by_type():
     block = template.get_block_by_type(Output)
 
     assert block is None
+
+
+def test_perform_resource_overrides():
+
+    template = tc()
+
+    fake_params = {"foo": StringType("bar")}
+
+    result = convert.perform_resource_overrides("fake_resource", fake_params, template)
+
+    assert result is fake_params
+
+    params = {"AccessControl": StringType("Private")}
+
+    result = convert.perform_resource_overrides("aws_s3_bucket", params, tc)
+
+    assert result is params
+
+    assert "AccessControl" not in result
+    assert "acl" in result
+    assert "private" == result["acl"]

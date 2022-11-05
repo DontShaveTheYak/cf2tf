@@ -3,15 +3,19 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
 
 from thefuzz import process  # type: ignore
 
 import cf2tf.conversion.expressions as functions
 import cf2tf.terraform._configuration as config
 import cf2tf.terraform.doc_file as doc_file
-
-from cf2tf.terraform.hcl2 import Block, Locals, Output, Resource, Variable
+from cf2tf.conversion.overrides import OVERRIDE_DISPATCH
+from cf2tf.terraform.blocks import Block, Locals, Output, Resource, Variable
+from cf2tf.terraform.hcl2 import AllTypes
+from cf2tf.terraform.hcl2.complex import ListType, MapType
+from cf2tf.terraform.hcl2.custom import CommentType, LiteralType
+from cf2tf.terraform.hcl2.primitive import NumberType, StringType, TerraformType
 
 if TYPE_CHECKING:
     from cf2tf.terraform.code import SearchManager
@@ -20,9 +24,10 @@ if TYPE_CHECKING:
 # Wish I could go back to this style of import but getting cycle error
 # from cf2tf.terraform import doc_file, Configuration
 
-
+ResourceName = str
+ResourceValues = Dict[str, Any]
 Template = Dict[str, Any]
-CFResource = Tuple[str, Dict[str, Any]]
+CFResource = Tuple[ResourceName, ResourceValues]
 CFResources = List[CFResource]
 Manifest = Dict[str, CFResources]
 
@@ -63,7 +68,11 @@ class TemplateConverter:
 
     def add_post_block(self, block: Block):
 
-        if block not in self.post_proccess_blocks:
+        block_refs = [block.base_ref() for block in self.post_proccess_blocks]
+
+        log.debug(block_refs)
+
+        if block.base_ref() not in block_refs:
             self.post_proccess_blocks.insert(0, block)
 
     def get_block_by_type(self, block_type: Type[Block]):
@@ -91,9 +100,9 @@ class TemplateConverter:
 
     def parse_template(self):
 
-        for section in self.valid_sections:
+        for section in self.cf_template:
 
-            if section not in self.cf_template:
+            if section not in self.valid_sections:
                 log.debug(
                     f"Ignoring section {section} not found in {self.valid_sections}"
                 )
@@ -144,7 +153,7 @@ class TemplateConverter:
         allowed_func: functions.Dispatch,
         prev_func: Optional[str] = None,
         inside_function=False,
-    ) -> Any:
+    ):
         """Recurses through a Cloudformation template. Solving all
         references and variables along the way.
 
@@ -183,21 +192,25 @@ class TemplateConverter:
 
                 return allowed_func[key](self, value)
 
-            return data
+            return MapType(data)
         elif isinstance(data, list):
-            return [
+            resolved_list_values = [
                 self.resolve_values(
                     item, allowed_func, prev_func, inside_function=inside_function
                 )
                 for item in data
             ]
+
+            return ListType(resolved_list_values)
+        elif isinstance(data, str):
+            return StringType(data)
+        elif isinstance(data, (int, float)):
+            return NumberType(data)
+        elif isinstance(data, datetime.date):
+            return StringType(str(data))
         else:
-
-            # todo What should we being doing with an integer? It shouldn't really be quoted?
-            # at least not on the terraform side? I think the code below will pass a 0 int value
-            # but will quote a 1
-
-            return f'"{data}"'
+            log.error(f"Found type {type(data)} with value {data}")
+            raise Exception(f"Unknown value {data}, in resolve function.")
 
     def convert_parameters(self, parameters: CFResources):
 
@@ -219,12 +232,12 @@ class TemplateConverter:
 
             converted_arguments = {k: v for k, v in tmp_props.items() if v != ""}
 
-            if "type" in converted_arguments:
-                converted_arguments["type"] = convert_parameter_type(
-                    converted_arguments["type"]
-                )
+            resolved_args = self.resolve_values(converted_arguments, {})
 
-            var = Variable(tf_name, converted_arguments)
+            if "type" in resolved_args:
+                resolved_args["type"] = convert_parameter_type(resolved_args["type"])
+
+            var = Variable(tf_name, MapType(resolved_args))
 
             tf_vars.append(var)
 
@@ -241,7 +254,7 @@ class TemplateConverter:
 
         resolved_values = self.resolve_values(dict_mappings, functions.ALL_FUNCTIONS)
 
-        mapping_args = {"mappings": convert_map(resolved_values)}
+        mapping_args = {"mappings": resolved_values}
 
         local_block = Locals(mapping_args)
 
@@ -259,19 +272,13 @@ class TemplateConverter:
 
         log.debug(resolved_values)
 
-        map_value: Dict[str, str] = {}
-
-        for key, value in resolved_values.items():
-            str_value = convert_map(value) if isinstance(value, dict) else str(value)
-            map_value[key] = str_value
-
         local_block = self.get_block_by_type(Locals)
 
         if local_block:
-            local_block.arguments.update(map_value)
+            local_block.arguments.update(resolved_values)
             return []
 
-        local_block = Locals(map_value)
+        local_block = Locals(resolved_values)
 
         self.post_proccess_blocks.append(local_block)
 
@@ -281,14 +288,14 @@ class TemplateConverter:
 
         tf_resources: List[Resource] = []
 
-        for resource_id, resource_props in resources:
+        for resource_id, resource_values in resources:
 
             log.debug(f"Converting Cloudformation resource {resource_id} to Terraform.")
 
             tf_name = pascal_to_snake(resource_id)
             log.debug(f"Converted name to {tf_name}")
 
-            resource_type = resource_props.get("Type")
+            resource_type = resource_values.get("Type")
 
             if not resource_type:
                 raise Exception("Type is required")
@@ -299,7 +306,7 @@ class TemplateConverter:
 
             tf_type = create_resource_type(docs_path)
 
-            log.debug(f"Converted type from {resource_props.get('Type')} to {tf_type}")
+            log.debug(f"Converted type from {resource_values.get('Type')} to {tf_type}")
 
             valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
 
@@ -311,24 +318,37 @@ class TemplateConverter:
                 f"Parsed the following attributes from the documentation: \n{valid_attributes}"
             )
 
-            properties = resource_props.get("Properties")
+            properties: Dict[str, Any] = resource_values.get("Properties", {})
 
-            if properties is None:
-                resource = Resource(
-                    tf_name, tf_type, {}, valid_arguments, valid_attributes
+            arguments = MapType(properties)
+
+            if properties:
+
+                log.debug(
+                    "Converting the intrinsic functions to Terraform expressions..."
                 )
-                tf_resources.append(resource)
-                continue
 
-            log.debug("Converting the intrinsic functions to Terraform expressions...")
+                resolved_values = self.resolve_values(
+                    properties, functions.ALL_FUNCTIONS
+                )
 
-            resolved_values = self.resolve_values(properties, functions.ALL_FUNCTIONS)
+                log.debug("Overiding Properties")
 
-            log.debug("Converting property names to argument names...")
+                overrided_values = perform_resource_overrides(
+                    tf_type, resolved_values, self
+                )
 
-            arguments = props_to_args(resolved_values, valid_arguments, docs_path)
+                log.debug("Converting property names to argument names...")
 
-            log.debug(f"Converted properties to {arguments}")
+                arguments = props_to_args(overrided_values, valid_arguments, docs_path)
+
+                log.debug(f"Converted properties to {arguments}")
+
+            conditional = resource_values.get("Condition")
+
+            if conditional is not None:
+                condition_map = {"count": LiteralType(f"locals.{conditional} ? 1 : 0")}
+                arguments = MapType({**condition_map, **arguments})
 
             resource = Resource(
                 tf_name, tf_type, arguments, valid_arguments, valid_attributes
@@ -431,7 +451,7 @@ def camel_case_split(text: str) -> str:
 
     items = re.findall(r"[A-Z\d](?:[a-z]+|\d|[A-Z]*(?=[A-Z]|$))", text)
 
-    return " ".join(items)
+    return " ".join(items) if items else text
 
 
 def create_resource_type(doc_path: Path):
@@ -453,13 +473,15 @@ def contains_functions(self, data: Dict[str, Any]):
 
 
 def props_to_args(
-    cf_props: Dict[str, Any], valid_tf_arguments: List[str], docs_path: Path
+    cf_props: Dict[str, AllTypes],
+    valid_tf_arguments: List[str],
+    docs_path: Path,
 ):
 
     # Search works better if we split the words apart, but we have to put it back together later
     search_items = [item.replace("_", " ") for item in valid_tf_arguments]
 
-    converted_attrs: Dict[str, Any] = {}
+    converted_attrs: Dict[str, AllTypes] = {}
 
     for prop_name, prop_value in cf_props.items():
 
@@ -471,12 +493,12 @@ def props_to_args(
 
     log.debug(f"Converted {cf_props.keys()} to {converted_attrs.keys()}")
 
-    return converted_attrs
+    return MapType(converted_attrs)
 
 
 def convert_prop_to_arg(
-    prop_name, prop_value, search_items: List[str], docs_path: Path
-):
+    prop_name: str, prop_value: AllTypes, search_items: List[str], docs_path: Path
+) -> Tuple[str, AllTypes]:
     search_term = camel_case_split(prop_name)
 
     log.debug(f"Searching for {search_term} instead of {prop_name}")
@@ -485,7 +507,8 @@ def convert_prop_to_arg(
 
     if not result:
         log.debug(f"No match found for {prop_name}, commenting out this argument.")
-        return f"// CF Property({prop_name})", str(prop_value)
+        # return f"// CF Property({prop_name})", str(prop_value)
+        return prop_name, CommentType(f"CF Property({prop_name}) = {prop_value}")
 
     attribute_match, ranking = result
 
@@ -494,8 +517,11 @@ def convert_prop_to_arg(
 
     log.debug(f"Converted {prop_name} to {tf_arg_name} with {ranking}% match.")
 
-    # Terraform sometimes has nested blocks, if prop_value is a map, its possible
+    # Terraform sometimes has nested blocks, if prop_value is a map/list, its possible
     # that tf_attribute_name is a nested block in terraform
+
+    if not isinstance(prop_value, (list, dict)):
+        return tf_arg_name, prop_value
 
     try:
         tf_arg, tf_values = parse_subsection(tf_arg_name, prop_value, docs_path)
@@ -506,7 +532,9 @@ def convert_prop_to_arg(
         )
 
 
-def parse_subsection(arg_name: str, prop_value: Any, docs_path: Path):
+def parse_subsection(
+    arg_name: str, prop_value: AllTypes, docs_path: Path
+) -> Tuple[str, AllTypes]:
     """Checks for a subsection and parses it if found. If a subsection
     is not found it will return arg_name and prop_value unchanged.
 
@@ -524,14 +552,14 @@ def parse_subsection(arg_name: str, prop_value: Any, docs_path: Path):
 
         if isinstance(prop_value, dict):
             log.debug(f"{arg_name} has Map value but no subsection in {docs_path}")
-            return arg_name, convert_map(prop_value)
+            return arg_name, prop_value
 
         return arg_name, prop_value
 
     valid_sub_args = doc_file.read_section(docs_path, section_name)
 
     if not valid_sub_args:
-        log.debug(f"{arg_name} has section in {docs_path} but section was empty.")
+        log.warning(f"{arg_name} has section in {docs_path} but section was empty.")
         return arg_name, prop_value
 
     log.debug(f"Valid {arg_name} arguments are {valid_sub_args}")
@@ -541,8 +569,11 @@ def parse_subsection(arg_name: str, prop_value: Any, docs_path: Path):
             f"Found section {section_name} but prop_value was {type(prop_value).__name__} not dict or list."
         )
 
-    # todo Sometimes cloudformation uses a list of objects but terraform uses nested blocks.
-    # We dont current support nested blocks correctly but we should still be able to parse them
+    # todo Nested blocks now have better support but this function will need to be refactored.
+    # Currently the function returns a tuple where the key is argument and the value is some terraform type.
+    # This works if the section is a key -> map in Cloudformation and nested block in terraform. But
+    # in some cases its key -> list in Cloudformation and Block, Block, Block in Terraform. This function
+    # will need to be modified so it returns something capable of expressing this relationship.
     if isinstance(prop_value, list):
 
         sub_args = [
@@ -550,30 +581,13 @@ def parse_subsection(arg_name: str, prop_value: Any, docs_path: Path):
             for sub_props in prop_value
         ]
 
-        return arg_name, sub_args
+        return arg_name, ListType(sub_args)
 
     sub_attrs = props_to_args(prop_value, valid_sub_args, docs_path)
-    return arg_name, sub_attrs
+    return arg_name, Block(arg_name, (), sub_attrs)
 
 
-def convert_map(values: Dict[str, Any], indent_level=1):
-
-    indent = "" if indent_level == 0 else indent_level * "  "
-
-    code_block = "{"
-
-    for name, value in values.items():
-
-        sub_value = (
-            convert_map(value, indent_level + 1) if isinstance(value, dict) else value
-        )
-
-        code_block = code_block + f"\n{indent}  {name} = {sub_value}"
-
-    return code_block + f"\n{indent}}}"
-
-
-def convert_parameter_type(param_type: str) -> str:
+def convert_parameter_type(param_type: str):
     type_conversion = {
         "String": "string",
         "Number": "number",
@@ -583,11 +597,29 @@ def convert_parameter_type(param_type: str) -> str:
 
     # todo We might need to handle other types like the SSM ones?
     if param_type not in type_conversion:
-        return "string"
+        return LiteralType("string")
 
-    return type_conversion[param_type]
+    return LiteralType(type_conversion[param_type])
 
 
 def add_space():
     if log.level == logging.DEBUG:
         print()
+
+
+def perform_resource_overrides(
+    tf_type: str, params: Dict[str, TerraformType], tc: TemplateConverter
+):
+
+    log.debug("Overiding params for {tf_type}")
+    if tf_type not in OVERRIDE_DISPATCH:
+        return params
+
+    param_overrides = OVERRIDE_DISPATCH[tf_type]
+
+    for param, override in param_overrides.items():
+
+        if param in params:
+            params = override(tc, params)
+
+    return params

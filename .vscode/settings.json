@@ -9,6 +9,11 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
   "python.linting.mypyEnabled": true,
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
+  },
   "[dockerfile]": {
     "editor.quickSuggestions": {
       "strings": true
