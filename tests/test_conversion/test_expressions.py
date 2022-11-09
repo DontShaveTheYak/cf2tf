@@ -380,13 +380,16 @@ def test_get_att_nested(fake_tc: TemplateConverter):
             [resource_id, test_attr],
         )
 
-    assert f"Unable to solve nested GetAttr {test_attr}" in str(e)
+    assert (
+        "Unable to solve nested GetAttr BucketName for test_stack and aws_s3_bucket"
+        in str(e)
+    )
 
     resource_props["Type"] = "AWS::CloudFormation::Stack"
 
     fake_tc.manifest["Resources"] = [(resource_id, resource_props)]
 
-    test_attr = "outputs.a"
+    test_attr = "Outputs.a"
 
     # Test attribute nested too far
     nested_attr = f"{test_attr}.toofar"
@@ -400,7 +403,7 @@ def test_get_att_nested(fake_tc: TemplateConverter):
 
     # Test normal result
 
-    expected_result = f"aws_cloudformation_stack.{resource_id}.{test_attr}"
+    expected_result = f"aws_cloudformation_stack.{resource_id}.{test_attr.lower()}"
 
     result = expressions.get_att(fake_tc, [resource_id, test_attr])
 
