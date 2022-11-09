@@ -1,0 +1,1589 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "CloudExchange CloudFormation deployment"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Basic details"
+        Parameters:
+          - CreateResources
+          - EnvName
+
+      - Label:
+          default: "Application Load Balancer details"
+        Parameters:
+          - CreateALB
+          - ExistingTargetGroup
+
+      - Label:
+          default: "Existing IAM role details"
+        Parameters:
+          - ExistingECSTaskRole
+          - ExistingSGandNACLLambdaRole
+
+      - Label:
+          default: "Existing resources details (applicable if 'Create new resources?' is 'False')"
+        Parameters:
+          - ExistingVPCId
+          - ExistingPrivateSubnet1ID
+          - ExistingPrivateSubnet2ID
+          - ExistingVPCCidr
+          - ExistingECSCluster
+
+      - Label:
+          default: "Network details (applicable if 'Create new resources?' is 'True')"
+        Parameters:
+          - VPCName
+          - VpcCIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - EnableVPCFlowLog
+
+      - Label:
+          default: "Environment variables"
+        Parameters:
+          - JWTSECRET
+          - MAINTENANCEPASSWORD
+          - MAINTENANCEPASSWORDESCAPED
+          - TLSVersion
+          - HTTPPROXY
+          - HTTPSPROXY
+          - WhitelistIP
+      
+    ParameterLabels:
+      VPCName:
+        default: "VPC name"
+      VpcCIDR:
+        default: "VPC CIDR range"
+      PrivateSubnet1CIDR:
+        default: "First private subnet CIDR range"
+      PrivateSubnet2CIDR:
+        default: "Second private subnet CIDR range"
+      ExistingVPCId:
+        default: "Existing VPC ID"
+      ExistingPrivateSubnet1ID:
+        default: "Existing first private subnet ID"
+      ExistingPrivateSubnet2ID:
+        default: "Existing second private subnet ID"
+      CreateResources:
+        default: "Create new resources?"
+      ExistingECSCluster:
+        default: "Existing ECS cluster name"
+      PublicSubnet1CIDR:
+        default: "First public subnet  CIDR"
+      PublicSubnet2CIDR:
+        default: "Second public subnet CIDR"
+      ExistingALB:
+        default: "Existing ALB"
+      ExistingTargetGroup:
+        default: "Existing ARN of target group for ALB"
+      ExistingVPCCidr:
+        default: "Existing VPC CIDR block"
+      JWTSECRET:
+        default: "JWT secret"
+      MAINTENANCEPASSWORD:
+        default: "Maintenance password"
+      MAINTENANCEPASSWORDESCAPED:
+        default: "Maintenance password escaped"
+      TLSVersion:
+        default: "TLS version"
+      HTTPPROXY:
+        default: "HTTP proxy"
+      HTTPSPROXY:
+        default: "HTTPS proxy"
+      WhitelistIP:
+        default: "CIDR to allow access to Netskope Cloud Exchange"
+      EnvName:
+        default: "Environment name"
+      CreateALB:
+        default: "Create Application Load Balancer?"
+      ExistingECSTaskRole:
+        default: "Existing IAM role for ECS Task creation & execution"
+      ExistingSGandNACLLambdaRole:
+        default: "Existing IAM role for read/modify Security Groups & NACL"
+      EnableVPCFlowLog:
+        default: "Enable VPC Flow Logs"
+
+
+Parameters:
+  CreateResources:
+    Description: "Select 'True' to create new resources (VPC, Subnet, IGW, NAT Gateway, TargetGroup, ALB, HTTP Listener, etc) and 'False' to use existing resources"
+    Default: "True"
+    Type: String
+    AllowedValues: ["True", "False"]
+
+  VPCName:
+    Description: "Enter the VPC name to create new VPC where Netskope Cloud Exchange will be deployed "
+    Type: String
+    Default: "CloudExchange-VPC"
+
+  VpcCIDR:
+    Description: "Enter the IP range (CIDR notation) for the VPC "
+    Type: String
+    Default: 172.16.0.0/16
+
+  ExistingVPCCidr:
+    Description: "Enter the VPC CIDR block of existing VPC  (required if 'Create new resources?' is 'False')"
+    Type: String
+    Default: 172.16.0.0/16
+
+  PrivateSubnet1CIDR:
+    Description: "Enter the IP range (CIDR notation) for first subnet "
+    Type: String
+    Default: 172.16.1.0/24
+
+  PrivateSubnet2CIDR:
+    Description: "Enter the IP Range (CIDR notation) for second subnet "
+    Type: String
+    Default: 172.16.2.0/24
+
+  ExistingVPCId:
+    Type: String
+    Default: ""
+    Description: "Enter the existing VPC ID where Netskope Cloud Exchange will be deployed (required if 'Create new resources?' is 'False')"
+
+  ExistingPrivateSubnet1ID:
+    Type: String
+    Default: ""
+    Description: "Enter the first subnet ID (in first availability zone) where the EFS filesystem for Netskope Cloud Exchange will be deployed. Note that custom resource Lambda function in this stack should be able to communicate from this subnet to Amazon S3 regional endpoint (required if 'Create new resources?' is 'False')"
+
+  ExistingPrivateSubnet2ID:
+    Type: String
+    Default: ""
+    Description: "Enter the second subnet ID (in second availability zone) where the EFS filesystem for Netskope Cloud Exchange will be deployed. Note that custom resource Lambda function in this stack should be able to communicate from this subnet to Amazon S3 regional endpoint (required if 'Create new resources?' is 'False')"
+
+  MAINTENANCEPASSWORD:
+    Description: "A maintenance password that will be used for RabbitMQ and MongoDB services (This password can be set only once)"
+    Type: String
+    Default: "cteadmin"
+    NoEcho: "true"
+
+  MAINTENANCEPASSWORDESCAPED:
+    Description: "URL encoded version of the Maintenance Password"
+    Type: String
+    Default: cteadmin
+    NoEcho: "true"
+
+  ExistingECSCluster:
+    Type: String
+    Default: ""
+    Description: "Enter the existing cluster to deploy Netskope Cloud Exchange service (if blank, new cluster will be created)"
+
+  PublicSubnet1CIDR:
+    Description: "Enter the IP range (CIDR notation) for the public subnet in first availability zone "
+    Type: String
+    Default: 172.16.3.0/24
+
+  PublicSubnet2CIDR:
+    Description: "Enter the IP range (CIDR notation) for the public subnet in second availability zone "
+    Type: String
+    Default: 172.16.4.0/24
+
+  ExistingTargetGroup:
+    Description: "Enter the ARN of existing target group attached to the load balancer to deploy Netskope Cloud Exchange (applicable if 'Create Application Load Balancer?' is 'False') (if provided existing ALB else if left blank, no ALB would be used)"
+    Type: String
+    Default: ""
+
+  TLSVersion:
+    Description: "This TLS version will be used to access the UI"
+    Type: String
+    Default: "TLSv1.3"
+    AllowedValues: ["TLSv1.3", "TLSv1.2 TLSv1.3"]
+
+  HTTPSPROXY:
+    Description: "Proxy URL to be used for outbound HTTPS traffic (e.g. https://user:password@10.0.0.0:3128)"
+    Type: String
+    Default: ""
+
+  HTTPPROXY:
+    Description: "Proxy URL to be used for outbound HTTP traffic (e.g. http://user:password@10.0.0.0:3128)"
+    Type: String
+    Default: ""
+
+  JWTSECRET:
+    Description: "A random secure string that will be used for signing the authentication tokens"
+    Type: String
+    Default: verysercterdyuri18
+    NoEcho: "true"
+
+  WhitelistIP:
+    Description: "Provide IP range to grant access for Netskope Cloud Exchange (required if load balancer is to be used)"
+    Type: String
+    Default: "172.16.0.0/16"
+  
+  EnvName:
+    Description: "This parameter is to support co-existence of multiple Netskope Cloud Exchange deployments"
+    Type: String
+    Default: "netskope-ce"
+    AllowedPattern: ^[a-zA-Z0-9//-]*$
+
+  CreateALB:
+    Type: String
+    Default: "True"
+    AllowedValues: ["True", "False"]
+
+  ExistingECSTaskRole:
+    Description: "Enter the ARN of the existing IAM role having required permissions for ECS Task creation/execution (if provided existing IAM role will be used else if left blank, new IAM role will be created)"
+    Type: String
+
+  ExistingSGandNACLLambdaRole:
+    Description: "Enter the ARN of the existing IAM role having required permissions for read & modify Security Groups & NACL for security best practices (if provided existing IAM role will be used else if left blank, new IAM role will be created) (applicable if 'Create new resources?' is 'True' else completely ignored)"
+    Type: String
+
+  EnableVPCFlowLog:
+    Description: "Select 'True' to enable VPC Flow Logs (AWS user account or the AWS IAM role deploying the CLoudFormation stack requires AWS IAM access to enable VPC Flow Logs) (It is recommended to enable VPC Flow Logs as per security best practices)"
+    Type: String
+    Default: "True"
+    AllowedValues: ["True", "False"]
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      ELBId: "127311923021"
+    us-east-2:
+      ELBId: "033677994240"
+    us-west-1:
+      ELBId: "027434742980"
+    us-west-2:
+      ELBId: "797873946194"
+    af-south-1:
+      ELBId: "098369216593"
+    ca-central-1:
+      ELBId: "985666609251"
+    eu-central-1:
+      ELBId: "054676820928"
+    eu-west-1:
+      ELBId: "156460612806"
+    eu-west-2:
+      ELBId: "652711504416"
+    eu-west-3:
+      ELBId: "009996457667"
+    eu-south-1:
+      ELBId: "635631232127"
+    eu-north-1:
+      ELBId: "897822967062"
+    ap-east-1:
+      ELBId: "754344448648"
+    ap-northeast-1:
+      ELBId: "582318560864"
+    ap-northeast-2:
+      ELBId: "600734575887"
+    ap-northeast-3:
+      ELBId: "383597477331"
+    ap-southeast-1:
+      ELBId: "114774131450"
+    ap-southeast-2:
+      ELBId: "783225319266"
+    ap-southeast-3:
+      ELBId: "589379963580"
+    ap-south-1:
+      ELBId: "718504428378"
+    me-south-1:
+      ELBId: "076674570225"
+    sa-east-1:
+      ELBId: "507241528517"
+    us-gov-west-1:
+      ELBId: "048591011584"
+    us-gov-east-1:
+      ELBId: "190560391635"
+    cn-north-1:
+      ELBId: "638102146993"
+    cn-northwest-1:
+      ELBId: "037604701340"
+
+Conditions:
+  ECSClusterFlag: !Equals
+    - !Ref ExistingECSCluster
+    - ""
+
+  ExistingALBFlag: !Not [ !Equals [ !Ref ExistingTargetGroup, "" ] ]
+  
+  CreateNewResources: !Equals
+    - !Ref CreateResources
+    - "True"
+
+  CreateALB: !Equals
+    - !Ref CreateALB
+    - "True"
+
+  CreateECSTaskRole: !Equals
+    - !Ref ExistingECSTaskRole
+    - ""
+
+  CreateLambdaRole: !Equals
+    - !Ref ExistingSGandNACLLambdaRole
+    - ""
+
+  VPCFlowLogCondition: !Equals
+    - !Ref EnableVPCFlowLog
+    - "True"
+
+  VPCFlowLogResourceCreation: !And [ Condition: CreateNewResources, Condition: VPCFlowLogCondition ]
+
+  SGandNACLModifyLambdaRole: !And [ Condition: CreateNewResources, Condition: CreateLambdaRole ]
+
+  CreateWithALB: !Or [ Condition: CreateALB, Condition: ExistingALBFlag]
+
+  CreateWithoutALB: !Not [Condition: CreateWithALB]
+
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Condition: CreateNewResources
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName}
+          
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Condition: CreateNewResources
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName} Private Subnet (AZ1)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Condition: CreateNewResources
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName} Private Subnet (AZ2)
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Condition: CreateNewResources
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName} Public Subnet (AZ1)
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Condition: CreateNewResources
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName} Public Subnet (AZ2)
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Condition: CreateNewResources
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName}
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CreateNewResources
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Condition: CreateNewResources
+    Properties:
+      Domain: VPC
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Condition: CreateNewResources
+    Properties:
+      Domain: vpc
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Condition: CreateNewResources
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Condition: CreateNewResources
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: CreateNewResources
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName} Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Condition: CreateNewResources
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateNewResources
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateNewResources
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Condition: CreateNewResources
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName} Private Routes (AZ1)
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Condition: CreateNewResources
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateNewResources
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Condition: CreateNewResources
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvName}-${VPCName} Private Routes (AZ2)
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Condition: CreateNewResources
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateNewResources
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  EC2EndpointSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Condition: CreateNewResources
+      DependsOn: PrivateSubnet2RouteTableAssociation
+      Properties:
+        VpcId: !Ref VPC
+        GroupName: !Sub "${AWS::StackName}-EC2-PrivateEndpoint-SG"
+        GroupDescription: Used by Netskope CE EC2 Endpoint
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 0
+            ToPort: 65535
+            CidrIp: !Ref VpcCIDR
+        SecurityGroupEgress:
+          - IpProtocol: "-1"
+            CidrIp: 0.0.0.0/0
+
+  EC2PrivateInterfaceEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Condition: CreateNewResources
+    DependsOn: PrivateSubnet2RouteTableAssociation
+    Properties:
+      VpcEndpointType: Interface
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ec2'
+      VpcId: !Ref VPC
+      SubnetIds: 
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref EC2EndpointSecurityGroup
+
+  NetskopeCloudExchangeTaskExecutionRole:
+    Type: "AWS::IAM::Role"
+    Condition: CreateECSTaskRole
+    Properties:
+      RoleName: !Sub "NetskopeCloudExchangeTaskExecutionRole-${AWS::StackName}"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+      Path: /
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+  NetskopeCloudExchangeTaskRole:
+    Type: "AWS::IAM::Role"
+    Condition: CreateECSTaskRole
+    Properties:
+      RoleName: !Sub "NetskopeCloudExchangeTaskRole-${AWS::StackName}"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: !Sub "NetskopeCloudExchangeTaskPolicy-${AWS::StackName}"
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "elasticfilesystem:ClientMount"
+                  - "elasticfilesystem:ClientWrite"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                Resource: "*"
+
+  VPCFlowLogRole:
+    Type: "AWS::IAM::Role"
+    Condition: VPCFlowLogResourceCreation
+    Properties:
+      RoleName: !Sub "NetskopeCloudExchangeFlowLogRole-${AWS::StackName}"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service:
+                - vpc-flow-logs.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: !Sub "NetskopeCloudExchangeFlowLogPolicy-${AWS::StackName}"
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:DescribeLogGroups"
+                  - "logs:DescribeLogStreams"
+                  - "logs:CreateLogGroup"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+  VPCFlowLog:
+    Type: AWS::EC2::FlowLog
+    Condition: VPCFlowLogResourceCreation
+    Properties:
+      DeliverLogsPermissionArn: !GetAtt VPCFlowLogRole.Arn
+      LogGroupName: !Sub "Netskope-CE-VPC-FlowLogsGroup-${AWS::StackName}"
+      ResourceId: !Ref VPC
+      ResourceType: VPC
+      TrafficType: REJECT
+      LogDestinationType: cloud-watch-logs
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !If [CreateNewResources, !Ref VPC, !Ref ExistingVPCId]
+      GroupName: !Sub "${AWS::StackName}-NetskopeCloudExchangeTaskGroup"
+      GroupDescription: Used by Netskope CloudExchange ECS task
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: !If [CreateNewResources, !Ref VpcCIDR, !Ref ExistingVPCCidr]
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateALB
+    Properties:
+      VpcId: !If [CreateNewResources, !Ref VPC, !Ref ExistingVPCId]
+      GroupName: !Sub "${AWS::StackName}-NetskopeCloudExchangeALBGroup"
+      GroupDescription: Used by Netskope ALB
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref WhitelistIP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref WhitelistIP
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  NetskopeCloudExchangeEFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !If [CreateNewResources, !Ref VPC, !Ref ExistingVPCId]
+      GroupDescription: Grants EFS access to the VPC subnets
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref TaskSecurityGroup
+
+  
+  RoleWaitHandle:
+    Condition: CreateECSTaskRole
+    DependsOn: NetskopeCloudExchangeTaskRole
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+
+  RoleWaitHandleFalse:
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+
+  RoleWaitCondition:
+    Type: "AWS::CloudFormation::WaitCondition"
+    Properties:
+      Handle: !If [CreateECSTaskRole, !Ref RoleWaitHandle, !Ref RoleWaitHandleFalse]
+      Timeout: "1"
+      Count: 0
+
+  NetskopeCloudExchangeEFS:
+    Type: "AWS::EFS::FileSystem"
+    DependsOn: RoleWaitCondition
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub "NetskopeCloudExchange-${AWS::StackName}"
+      FileSystemPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "elasticfilesystem:ClientMount"
+              - "elasticfilesystem:ClientWrite"
+            Principal:
+              AWS: !If [CreateECSTaskRole, !Sub "arn:aws:iam::${AWS::AccountId}:role/NetskopeCloudExchangeTaskRole-${AWS::StackName}", !Ref ExistingECSTaskRole]
+            Condition:
+              Bool:
+                "aws:SecureTransport": true
+
+  MountTargetResource1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref NetskopeCloudExchangeEFS
+      SubnetId:
+        !If [CreateNewResources, !Ref PrivateSubnet1, !Ref ExistingPrivateSubnet1ID]
+      SecurityGroups:
+        - !Ref NetskopeCloudExchangeEFSSecurityGroup
+
+  MountTargetResource2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref NetskopeCloudExchangeEFS
+      SubnetId:
+        !If [CreateNewResources, !Ref PrivateSubnet2, !Ref ExistingPrivateSubnet2ID]
+      SecurityGroups:
+        - !Ref NetskopeCloudExchangeEFSSecurityGroup
+
+  MongoDBAccessPoint:
+    Type: "AWS::EFS::AccessPoint"
+    Properties:
+      FileSystemId: !Ref NetskopeCloudExchangeEFS
+      PosixUser:
+        Uid: "1001"
+        Gid: "1001"
+      RootDirectory:
+        Path: "/data/mongo-data"
+        CreationInfo:
+          OwnerGid: "1001"
+          OwnerUid: "1001"
+          Permissions: "0777"
+
+  SSLCertAccessPoint:
+    Type: "AWS::EFS::AccessPoint"
+    Properties:
+      FileSystemId: !Ref NetskopeCloudExchangeEFS
+      PosixUser:
+        Uid: "1001"
+        Gid: "1001"
+      RootDirectory:
+        Path: "/data/ssl_certs"
+        CreationInfo:
+          OwnerGid: "1001"
+          OwnerUid: "1001"
+          Permissions: "0777"
+
+  CustomPluginsAccessPoint:
+    Type: "AWS::EFS::AccessPoint"
+    Properties:
+      FileSystemId: !Ref NetskopeCloudExchangeEFS
+      PosixUser:
+        Uid: "1001"
+        Gid: "1001"
+      RootDirectory:
+        Path: "/data/custom_plugins"
+        CreationInfo:
+          OwnerGid: "1001"
+          OwnerUid: "1001"
+          Permissions: "0777"
+
+  RabbitMQAccessPoint:
+    Type: "AWS::EFS::AccessPoint"
+    Properties:
+      FileSystemId: !Ref NetskopeCloudExchangeEFS
+      PosixUser:
+        Uid: "1001"
+        Gid: "1001"
+      RootDirectory:
+        Path: "/data/rabbitmq"
+        CreationInfo:
+          OwnerGid: "1001"
+          OwnerUid: "1001"
+          Permissions: "0777"
+
+  NetskopeTaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/ecs/Netskope-Cloud-Exchange-3-${EnvName}
+      RetentionInDays: 3653
+
+  NetskopeECSCluster:
+    Type: "AWS::ECS::Cluster"
+    Condition: ECSClusterFlag
+    Properties:
+      ClusterName: !Sub Netskope-CE-${EnvName}-Cluster
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  taskdefinition:
+    Type: "AWS::ECS::TaskDefinition"
+    Properties:
+      ContainerDefinitions:
+        - Name: mongodb-primary
+          Image: "709825985650.dkr.ecr.us-east-1.amazonaws.com/netskope/mongodb:05252022"
+          Cpu: 0
+          PortMappings:
+            - ContainerPort: 27017
+              HostPort: 27017
+              Protocol: tcp
+          Essential: true
+          Command: []
+          Environment:
+            - Name: MONGODB_SYSTEM_LOG_VERBOSITY
+              Value: "0"
+            - Name: MONGODB_DATABASE
+              Value: cte
+            - Name: MONGODB_ROOT_PASSWORD
+              Value: !Ref MAINTENANCEPASSWORD
+            - Name: MONGODB_ADVERTISED_HOSTNAME
+              Value: localhost
+            - Name: MONGODB_PASSWORD
+              Value: !Ref MAINTENANCEPASSWORD
+            - Name: MONGODB_USERNAME
+              Value: cteadmin
+            - Name: HTTP_PROXY
+              Value: !Ref HTTPPROXY
+            - Name: HTTPS_PROXY
+              Value: !Ref HTTPSPROXY
+          MountPoints:
+            - SourceVolume: mongo-data
+              ContainerPath: /bitnami/mongodb
+              ReadOnly: false
+          VolumesFrom: []
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /aws/ecs/Netskope-Cloud-Exchange-3-${EnvName}
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: Netskope
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - >-
+                if mongo --quiet cte --eval 'quit(db.runCommand({ ping: 1 }).ok
+                ? 0 : 2)'; then exit 0; fi; exit 1;
+            Interval: 10
+            Timeout: 10
+            Retries: 10
+            StartPeriod: 60
+
+        - Name: core
+          Image: "709825985650.dkr.ecr.us-east-1.amazonaws.com/netskope/core3:11012022"
+          Cpu: 0
+          PortMappings: []
+          Essential: true
+          Command: []
+          Environment:
+            - Name: MONGO_CONNECTION_STRING
+              Value: !Join
+              - ''
+              - - 'mongodb://cteadmin:'
+                - Ref: MAINTENANCEPASSWORDESCAPED
+                - '@localhost:27017/cte'
+            - Name: RABBITMQ_CONNECTION_STRING
+              Value: !Join
+              - ''
+              - - 'amqp://user:'
+                - Ref: MAINTENANCEPASSWORDESCAPED
+                - '@localhost'
+            - Name: ENABLE_CELERY_BEAT
+              Value: "true"
+            - Name: JWT_ALGORITHM
+              Value: HS256
+            - Name: JWT_SECRET
+              Value: !Ref JWTSECRET
+            - Name: INITIAL_WAIT
+              Value: "600"
+            - Name: ANALYTICS_BASE_URL
+              Value: "https://reporting.netskope.tech"
+            - Name: ANALYTICS_TOKEN
+              Value: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpbnN0YWxsYXRpb25faWQiOiJjMDAyIn0.w8SVrTcDjk8PkR4IcbWGwOyf6-OWfCUyOoCTgZvqHqc
+          MountPoints:
+            - SourceVolume: custom_plugins
+              ContainerPath: /opt/netskope/plugins/custom_plugins
+              ReadOnly: false
+          VolumesFrom: []
+          DependsOn:
+            - ContainerName: mongodb-primary
+              Condition: HEALTHY
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /aws/ecs/Netskope-Cloud-Exchange-3-${EnvName}
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: Netskope
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - nc -vz localhost 80 || exit 1
+            Interval: 10
+            Timeout: 10
+            Retries: 10
+            StartPeriod: 60
+
+        - Name: ui
+          Image: "709825985650.dkr.ecr.us-east-1.amazonaws.com/netskope/ui3:11012022"
+          Cpu: 0
+          PortMappings:
+            - ContainerPort: 3000
+              HostPort: 3000
+              Protocol: tcp
+          Essential: true
+          Command: []
+          Environment:
+            - Name: CE_API_URL
+              Value: "http://localhost"
+            - Name: TLS_VERSION
+              Value: !Ref TLSVersion
+          MountPoints:
+            - SourceVolume: ssl_certs
+              ContainerPath: /tmp/ssl_certs
+              ReadOnly: false
+          VolumesFrom: []
+          DependsOn:
+            - ContainerName: core
+              Condition: START
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /aws/ecs/Netskope-Cloud-Exchange-3-${EnvName}
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: Netskope
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - "curl -f http://localhost:3000 || exit 1"
+            Interval: 10
+            Timeout: 10
+            Retries: 10
+            StartPeriod: 60
+
+        - Name: rabbitmq-stats
+          Image: "709825985650.dkr.ecr.us-east-1.amazonaws.com/netskope/rabbitmq:05252022"
+          Cpu: 0
+          PortMappings:
+            - ContainerPort: 15672
+              HostPort: 15672
+              Protocol: tcp
+            - ContainerPort: 5672
+              HostPort: 5672
+              Protocol: tcp
+          Essential: true
+          Command: []
+          Environment:
+            - Name: RABBITMQ_SECURE_PASSWORD
+              Value: "yes"
+            - Name: RABBITMQ_NODE_NAME
+              Value: rabbit@127.0.0.1
+            - Name: RABBITMQ_ERL_COOKIE
+              Value: !Ref MAINTENANCEPASSWORD
+            - Name: RABBITMQ_NODE_TYPE
+              Value: stats
+            - Name: RABBITMQ_USE_LONGNAME
+              Value: "true"
+            - Name: RABBITMQ_PASSWORD
+              Value: !Ref MAINTENANCEPASSWORD
+            - Name: RABBITMQ_DISK_FREE_ABSOLUTE_LIMIT
+              Value: 1
+          MountPoints:
+            - SourceVolume: rabbitmq
+              ContainerPath: /bitnami/rabbitmq/conf
+              ReadOnly: false
+          VolumesFrom: []
+          DependsOn:
+            - ContainerName: core
+              Condition: START
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /aws/ecs/Netskope-Cloud-Exchange-3-${EnvName}
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: Netskope
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - rabbitmq-diagnostics -q ping
+            Interval: 10
+            Timeout: 10
+            Retries: 10
+            StartPeriod: 60
+      TaskRoleArn: !If [CreateECSTaskRole, !Ref NetskopeCloudExchangeTaskRole, !Ref ExistingECSTaskRole]
+      ExecutionRoleArn: !If [CreateECSTaskRole, !Ref NetskopeCloudExchangeTaskExecutionRole, !Ref ExistingECSTaskRole]
+      NetworkMode: awsvpc
+      Volumes:
+        - Name: mongo-data
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref NetskopeCloudExchangeEFS
+            RootDirectory: /
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref MongoDBAccessPoint
+              IAM: ENABLED
+        - Name: custom_plugins
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref NetskopeCloudExchangeEFS
+            RootDirectory: /
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref CustomPluginsAccessPoint
+              IAM: ENABLED
+        - Name: ssl_certs
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref NetskopeCloudExchangeEFS
+            RootDirectory: /
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref SSLCertAccessPoint
+              IAM: ENABLED
+        - Name: rabbitmq
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref NetskopeCloudExchangeEFS
+            RootDirectory: /
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref RabbitMQAccessPoint
+              IAM: ENABLED
+
+      PlacementConstraints: []
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: "4096"
+      Memory: "8192"
+      Family: !Sub NetskopeCloudExhange3-${EnvName}
+
+  NetskopeTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: CreateALB
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Name: !Sub TargetGroup-${EnvName}
+      Port: 3000
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      TargetType: ip
+      Matcher:
+        HttpCode: "200"
+      UnhealthyThresholdCount: 5
+      VpcId: !If [CreateNewResources, !Ref VPC, !Ref ExistingVPCId]
+
+  AccessLogS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Condition: CreateALB
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join
+                  - "-"
+                  - - "netskope-ce-alb-logs"
+                    - !Select
+                      - 2
+                      - !Split
+                        - "/"
+                        - !Ref "AWS::StackId"
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: TRUE
+        BlockPublicPolicy: TRUE
+        IgnorePublicAcls: TRUE
+        RestrictPublicBuckets: TRUE
+      AccessControl: Private
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LoggingBucket
+        LogFilePrefix: access-logs
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: TRUE
+      LifecycleConfiguration:
+        Rules:
+          - Id: LifecycleRule
+            Prefix: glacier
+            Status: Enabled
+            ExpirationInDays: 365
+            Transitions:
+              - TransitionInDays: 1
+                StorageClass: GLACIER
+
+  LoggingBucket:
+    Type: 'AWS::S3::Bucket'
+    Condition: CreateALB
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join
+                  - "-"
+                  - - "netskope-ce-s3events-logs-"
+                    - !Select
+                      - 2
+                      - !Split
+                        - "/"
+                        - !Ref "AWS::StackId"
+      AccessControl: LogDeliveryWrite
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: TRUE
+        BlockPublicPolicy: TRUE
+        IgnorePublicAcls: TRUE
+        RestrictPublicBuckets: TRUE
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: TRUE
+      LifecycleConfiguration:
+        Rules:
+          - Id: LogRule
+            Prefix: glacier
+            Status: Enabled
+            ExpirationInDays: 365
+            Transitions:
+              - TransitionInDays: 1
+                StorageClass: GLACIER
+
+  LoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: LoggingBucket
+    Condition: CreateALB
+    Properties:
+      Bucket: !Ref LoggingBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Deny
+          Principal: '*'
+          Action: 's3:*'
+          Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref LoggingBucket
+                - /*
+          Condition:
+            Bool:
+              aws:SecureTransport: false
+
+  AccessLogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: AccessLogS3Bucket
+    Condition: CreateALB
+    Properties:
+      Bucket: !Ref AccessLogS3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS: !Join ["", ['arn:aws:iam::', !FindInMap [RegionMap,!Ref "AWS::Region", ELBId], ':root']]
+          Action: s3:PutObject
+          Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref AccessLogS3Bucket
+                - /*
+        - Effect: Deny
+          Principal: '*'
+          Action: 's3:*'
+          Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref AccessLogS3Bucket
+                - /*
+          Condition:
+            Bool:
+              aws:SecureTransport: false
+
+  NetskopeLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Condition: CreateALB
+    Properties:
+      IpAddressType: ipv4
+      Name: !Sub NetskopeCELB-${EnvName}
+      Scheme: internal
+      SecurityGroups: [!Ref ALBSecurityGroup]
+      Subnets:  !If [
+        CreateNewResources,
+        [!Ref PrivateSubnet1, !Ref PrivateSubnet2], 
+        [!Ref ExistingPrivateSubnet1ID, !Ref ExistingPrivateSubnet2ID]
+      ]
+      Type: application
+      LoadBalancerAttributes: 
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: true
+        - Key: access_logs.s3.enabled
+          Value: true
+        - Key: access_logs.s3.bucket
+          Value: !Ref AccessLogS3Bucket
+
+  HTTPlistener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Condition: CreateALB
+    Properties:
+      DefaultActions:
+        - Type: "forward"
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref NetskopeTargetGroup
+                Weight: 1
+      LoadBalancerArn: !Ref NetskopeLB
+      Port: 80
+      Protocol: "HTTP"
+
+  AlbWaitHandle:
+    Condition: CreateALB
+    DependsOn: HTTPlistener
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+
+  WaitHandle:
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+
+  WaitCondition:
+    Type: "AWS::CloudFormation::WaitCondition"
+    Properties:
+      Handle: !If [CreateALB, !Ref AlbWaitHandle, !Ref WaitHandle]
+      Timeout: "1"
+      Count: 0
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Condition: SGandNACLModifyLambdaRole
+    Properties:
+      RoleName: !Sub LambdaRole_${EnvName}
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+                - ssm.amazonaws.com
+            Action: sts:AssumeRole
+
+      Path: '/'
+      Policies:
+          - PolicyName: !Sub "revoke_lambda_policy_${AWS::StackName}"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - "ec2:DescribeSecurityGroupReferences"
+                    - "ec2:DescribeSecurityGroups"
+                    - "ec2:UpdateSecurityGroupRuleDescriptionsEgress"
+                    - "ec2:UpdateSecurityGroupRuleDescriptionsIngress"
+                    - "ec2:RevokeSecurityGroupIngress"
+                    - "ec2:RevokeSecurityGroupEgress"
+                    - "ec2:DescribeNetworkAcls"
+                    - "ec2:DeleteNetworkAclEntry"
+                  Resource:
+                    - '*'
+                
+  RevokeDefaultVPCSGRule:
+    Type: AWS::Lambda::Function
+    Condition: CreateNewResources
+    DependsOn: VPC
+    Properties:
+      FunctionName: !Sub RevokeDefaultVPCSGRule_${EnvName}
+      Role: !If [SGandNACLModifyLambdaRole, !GetAtt LambdaRole.Arn, !Ref ExistingSGandNACLLambdaRole]
+      Runtime: python3.7
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+
+          # Creating an object
+          logger = logging.getLogger()
+          
+          # Setting the threshold of logger to DEBUG
+          logger.setLevel(logging.DEBUG)
+
+
+          def lambda_handler(event, context):
+
+              try:
+                  ec2 = boto3.resource('ec2')
+                  sg_id = os.getenv('groupid', '')
+
+                  sg = ec2.SecurityGroup(sg_id)
+              
+                  if sg.ip_permissions_egress:
+                      sg.revoke_egress(IpPermissions=sg.ip_permissions_egress)
+                      logger.info("Egress rules removed for the default security group: " + sg_id)
+              
+                  if sg.ip_permissions:
+                      sg.revoke_ingress(IpPermissions=sg.ip_permissions)
+                      logger.info("Ingress rules removed for the default security group: " + sg_id)
+              
+                  return {
+                    'statusCode': 200,
+                    'body': json.dumps('Inbound and Outbound rules removed for VPC default security group: ' + sg_id)
+                  }
+              except Exception as e:
+                  logger.error("Error while removing the egress and ingress rules from the default security group: " + sg_id)
+                  raise(e)    
+      Environment:
+        Variables:
+          groupid: !GetAtt VPC.DefaultSecurityGroup
+
+  RevokeDefaultVPCSGRuleInvoke:
+    Type: AWS::Events::Rule
+    DependsOn: RevokeDefaultVPCSGRule
+    Condition: CreateNewResources
+    Properties:
+      Name: !Sub RevokeDefaultVPCSGRuleInvoke_${EnvName}
+      Description: "Test"
+      EventPattern:
+        source:
+          - "aws.cloudformation"
+        detail-type:
+          - "CloudFormation Stack Status Change"
+        detail: 
+          stack-id: [!Sub '${AWS::StackId}']
+          status-details:
+            status: ['CREATE_COMPLETE']
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt RevokeDefaultVPCSGRule.Arn
+          Id:  !Sub RevokeDefaultVPCSGRuleInvoke_${EnvName}
+  
+  PermissionToInvokeDefaultVPCSGRule:
+    Type: AWS::Lambda::Permission
+    DependsOn: RevokeDefaultVPCSGRule
+    Condition: CreateNewResources
+    Properties:
+      FunctionName:
+        Ref: "RevokeDefaultVPCSGRule"
+      Action: "lambda:InvokeFunction"
+      Principal: events.amazonaws.com
+      SourceArn: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/RevokeDefaultVPCSGRuleInvoke_${EnvName}'
+
+  RevokeDefaultVPCNACLRule:
+    Type: AWS::Lambda::Function
+    Condition: CreateNewResources
+    DependsOn: VPC
+    Properties:
+      FunctionName: !Sub RevokeDefaultVPCNACLRule_${EnvName}
+      Role: !If [SGandNACLModifyLambdaRole, !GetAtt LambdaRole.Arn, !Ref ExistingSGandNACLLambdaRole]
+      Runtime: python3.7
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import os
+          import boto3
+          import json
+          import logging
+          logger = logging.getLogger()
+          def lambda_handler(event, context):
+              try:
+                  is_entries_removed = False
+                  ec2 = boto3.resource('ec2')
+                  nacl_id = os.getenv('naclid', '')
+                  network_acl = ec2.NetworkAcl(nacl_id)
+
+                  for entry in network_acl.entries:
+                      if entry.get('CidrBlock') == '0.0.0.0/0' and entry.get('Egress') is False and \
+                              entry.get('RuleAction') == 'allow' and entry.get('Protocol') == '-1':
+                          network_acl.delete_entry(Egress=False, RuleNumber=entry.get('RuleNumber'))
+                          logger.info(f'Rule entry {entry} removed from network ACL')
+                          is_entries_removed = True
+                  if not is_entries_removed:
+                      return {
+                        'statusCode': 200,
+                        'body': json.dumps('No rule entries present in Network NACL ' +  nacl_id + ' which satisfies the rule condition.')
+                      }
+                      
+                  return {
+                    'statusCode': 200,
+                    'body': json.dumps('Inbound rules removed for default NACL ' + nacl_id + 'of VPC.')
+                  }
+              except Exception as e:
+                  logger.error('Error while removing the ingress rules from the default NACL ' + nacl_id + 'of VPC.')
+                  raise(e)    
+      Environment:
+        Variables:
+          naclid: !GetAtt VPC.DefaultNetworkAcl
+
+  RevokeDefaultVPCNACLRuleInvoke:
+    Type: AWS::Events::Rule
+    DependsOn: RevokeDefaultVPCNACLRule
+    Condition: CreateNewResources
+    Properties:
+      Name: !Sub RevokeDefaultVPCNACLRuleInvoke_${EnvName}
+      Description: "Test"
+      EventPattern:
+        source:
+          - "aws.cloudformation"
+        detail-type:
+          - "CloudFormation Stack Status Change"
+        detail: 
+          stack-id: [!Sub '${AWS::StackId}']
+          status-details:
+            status: ['CREATE_COMPLETE']
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt RevokeDefaultVPCNACLRule.Arn
+          Id:  !Sub RevokeDefaultVPCNACLRuleInvoke_${EnvName}
+          
+  PermissionToInvokeDefaultVPCACLRule:
+    Type: AWS::Lambda::Permission
+    DependsOn: RevokeDefaultVPCNACLRule
+    Condition: CreateNewResources
+    Properties:
+      FunctionName:
+        Ref: "RevokeDefaultVPCNACLRule"
+      Action: "lambda:InvokeFunction"
+      Principal: events.amazonaws.com
+      SourceArn: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/RevokeDefaultVPCNACLRuleInvoke_${EnvName}'
+
+  DefaultNACLInboundRule110:
+    Type: AWS::EC2::NetworkAclEntry
+    DependsOn: VPC
+    Condition: CreateNewResources
+    Properties:
+       NetworkAclId: !GetAtt VPC.DefaultNetworkAcl
+       RuleNumber: 110
+       Protocol: 6
+       RuleAction: Allow
+       CidrBlock: !Ref VpcCIDR
+       PortRange:
+         From: 443
+         To: 443
+
+  DefaultNACLInboundRule105:
+    Type: AWS::EC2::NetworkAclEntry
+    DependsOn: VPC
+    Condition: CreateNewResources
+    Properties:
+       NetworkAclId: !GetAtt VPC.DefaultNetworkAcl
+       RuleNumber: 105
+       Protocol: 6
+       RuleAction: Allow
+       CidrBlock: 0.0.0.0/0
+       PortRange:
+         From: 1024 
+         To: 65535
+         
+  ECSClusterServiceWithALB:
+    Type: AWS::ECS::Service
+    DependsOn: WaitCondition
+    Condition: CreateWithALB
+    Properties:
+      Cluster:
+        !If [
+          ECSClusterFlag,
+          !GetAtt NetskopeECSCluster.Arn,
+          !Ref ExistingECSCluster,
+        ]
+      DesiredCount: 1
+      TaskDefinition: !Ref taskdefinition
+      LaunchType: FARGATE
+      ServiceName: !Sub NetskopeCloudExchange-${EnvName}
+      LoadBalancers:
+        - TargetGroupArn:
+            !If [CreateALB, Ref: NetskopeTargetGroup, Ref: ExistingTargetGroup]
+          ContainerPort: 3000
+          ContainerName: ui
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [!Ref TaskSecurityGroup]
+          Subnets:
+            !If [
+              CreateNewResources,
+              [!Ref PrivateSubnet1, !Ref PrivateSubnet2],
+              [!Ref ExistingPrivateSubnet1ID, !Ref ExistingPrivateSubnet2ID],
+            ]
+
+  ECSClusterServiceWithoutALB:
+    Type: AWS::ECS::Service
+    DependsOn: WaitCondition
+    Condition: CreateWithoutALB
+    Properties:
+      Cluster:
+        !If [
+          ECSClusterFlag,
+          !GetAtt NetskopeECSCluster.Arn,
+          !Ref ExistingECSCluster,
+        ]
+      DesiredCount: 1
+      TaskDefinition: !Ref taskdefinition
+      LaunchType: FARGATE
+      ServiceName: !Sub NetskopeCloudExchange-${EnvName}
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [!Ref TaskSecurityGroup]
+          Subnets:
+            !If [
+              CreateNewResources,
+              [!Ref PrivateSubnet1, !Ref PrivateSubnet2],
+              [!Ref ExistingPrivateSubnet1ID, !Ref ExistingPrivateSubnet2ID],
+            ]
+
+
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !If [CreateNewResources, !Ref VPC, !Ref ExistingVPCId]
+
+  PrivateSubnets:
+    Description: A list of the public subnets
+    Value:
+      !If [
+        CreateNewResources,
+        !Join [",", [!Ref PrivateSubnet1, !Ref PrivateSubnet2]],
+        !Join [",", [!Ref ExistingPrivateSubnet1ID, !Ref ExistingPrivateSubnet2ID]],
+      ]
+
+  PrivateSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !If [CreateNewResources, !Ref PrivateSubnet1, !Ref ExistingPrivateSubnet1ID]
+
+  PrivateSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !If [CreateNewResources, !Ref PrivateSubnet2, !Ref ExistingPrivateSubnet2ID]
+
+  NetskopeCloudExchangeEFS:
+    Value: !Ref NetskopeCloudExchangeEFS
+    Description: EFS filesystem for Netskope Cloud Exchange
+
+  MongoDBAccessPoint:
+    Value: !Ref MongoDBAccessPoint
+    Description: Mongo DB Access Point
+
+  SSLCertAccessPoint:
+    Value: !Ref SSLCertAccessPoint
+    Description: SSL Certs Access Point
+
+  CustomPluginsAccessPoint:
+    Value: !Ref CustomPluginsAccessPoint
+    Description: Custom Plugins Access Point
+
+  RabbitMQAccessPoint:
+    Value: !Ref RabbitMQAccessPoint
+    Description: RabbitMQ Access Point
+
+  TaskSecurityGroup:
+    Value: !Ref TaskSecurityGroup
+    Description: Security Group for Netskope CloudExchange ECS task
+
+  AWSRegion:
+    Value: !Ref AWS::Region
+    Description: AWS Region
+  
+  ECSCluster:
+    Value:
+      !If [
+        ECSClusterFlag,
+        !GetAtt NetskopeECSCluster.Arn,
+        !Ref ExistingECSCluster,
+      ]
+    Description: ECS Cluster to deploy Netskope CloudExchange Application

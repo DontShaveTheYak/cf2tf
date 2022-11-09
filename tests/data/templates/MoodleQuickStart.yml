@@ -1,0 +1,1051 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  UserPrefix:
+    Type: String
+    Default: moodleIOMAD
+    Description: Unique ID to be used as resource prefix
+  MoodleVolumeSize:
+    Type: String
+    Default: '30'
+    Description: Storage volume size (GB)
+  KeypairName:
+    Type: String
+    Description: Name of the previously created keypair
+  DBUsername:
+    NoEcho: 'true'
+    Description: Username for MySQL database access
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBPassword:
+    NoEcho: 'true'
+    Description: Password MySQL database access
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: must contain only alphanumeric characters.
+Outputs:
+  PluginUser:
+    Description: User for Moodle S3 plugin
+    Value:
+      Ref: PluginUser
+  RepoUser:
+    Description: User to manage S3 content
+    Value:
+      Ref: MoodleRepoUser
+  Version:
+    Description: Latest update of the template
+    Value: Dec 1, 2021
+  Documents:
+    Description: Bucket name to store documents
+    Value:
+      Ref: BucketDocuments
+  Videos:
+    Description: Bucket para almacenar videos
+    Value:
+      Ref: BucketVideos
+  Images:
+    Description: Bucket to store images
+    Value:
+      Ref: BucketImages
+  MoodleDNS:
+    Description: Moodle Public IP
+    Value:
+      Ref: MoodleEIP
+  RDSMysqlDNS:
+    Description: RDS connection DNS
+    Value:
+      Fn::GetAtt:
+      - MoodleRDS
+      - Endpoint.Address
+  RDSMysqlPort:
+    Description: RDS connection port
+    Value:
+      Fn::GetAtt:
+      - MoodleRDS
+      - Endpoint.Port
+Resources:
+  PluginUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName:
+        Fn::Sub: "${UserPrefix}-moodle-pluginuser"
+      Groups:
+      - Ref: MoodleGroup
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: a1806463-ba49-40e1-b30a-12b5b3d61bb0
+  MoodleGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName:
+        Fn::Sub: "${UserPrefix}-moodle-group"
+      ManagedPolicyArns:
+      - Ref: MoodleManagedPolicy
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: ee3dfe8d-c974-4f11-9d5a-86d4b2dee3e4
+  MoodleRepoUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName:
+        Fn::Sub: "${UserPrefix}-moodle-repouser"
+      Groups:
+      - Ref: MoodleGroup
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 2e6973f7-4acc-4c75-a67b-8352ce752726
+  BucketImages:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: "${UserPrefix}-moodle-s3-images"
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 7a054423-40e7-4275-818a-14df7e9229e3
+  BucketVideos:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: "${UserPrefix}-moodle-s3-videos"
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 80f1e7a4-6e69-4363-b6f8-e449bcf1c2de
+  BucketDocuments:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: "${UserPrefix}-moodle-s3-documents"
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: d464b3a5-b243-4527-9f45-207c2f3e438c
+  MoodleManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName:
+        Fn::Sub: "${UserPrefix}-moodle-iam-policy"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: VisualEditor0
+          Effect: Allow
+          Action:
+          - s3:GetAccessPoint
+          - s3:PutAccountPublicAccessBlock
+          - s3:GetAccountPublicAccessBlock
+          - s3:ListAllMyBuckets
+          - s3:ListAccessPoints
+          - s3:ListJobs
+          - s3:ListBucket
+          - s3:CreateJob
+          - s3:HeadBucket
+          Resource: "*"
+        - Sid: VisualEditor1
+          Effect: Allow
+          Action:
+          - s3:PutAnalyticsConfiguration
+          - s3:GetObjectVersionTagging
+          - s3:DeleteAccessPoint
+          - s3:CreateBucket
+          - s3:ReplicateObject
+          - s3:GetObjectAcl
+          - s3:GetBucketObjectLockConfiguration
+          - s3:DeleteBucketWebsite
+          - s3:PutLifecycleConfiguration
+          - s3:GetObjectVersionAcl
+          - s3:PutBucketAcl
+          - s3:DeleteObject
+          - s3:GetBucketPolicyStatus
+          - s3:GetObjectRetention
+          - s3:GetBucketWebsite
+          - s3:PutReplicationConfiguration
+          - s3:PutObjectLegalHold
+          - s3:GetObjectLegalHold
+          - s3:GetBucketNotification
+          - s3:PutBucketCORS
+          - s3:DeleteBucketPolicy
+          - s3:GetReplicationConfiguration
+          - s3:ListMultipartUploadParts
+          - s3:PutObject
+          - s3:GetObject
+          - s3:PutBucketNotification
+          - s3:DescribeJob
+          - s3:PutBucketLogging
+          - s3:PutObjectVersionAcl
+          - s3:GetAnalyticsConfiguration
+          - s3:PutBucketObjectLockConfiguration
+          - s3:GetObjectVersionForReplication
+          - s3:PutAccessPointPolicy
+          - s3:CreateAccessPoint
+          - s3:GetLifecycleConfiguration
+          - s3:GetInventoryConfiguration
+          - s3:GetBucketTagging
+          - s3:PutAccelerateConfiguration
+          - s3:DeleteObjectVersion
+          - s3:GetBucketLogging
+          - s3:ListBucketVersions
+          - s3:RestoreObject
+          - s3:GetAccelerateConfiguration
+          - s3:GetBucketPolicy
+          - s3:PutEncryptionConfiguration
+          - s3:GetEncryptionConfiguration
+          - s3:GetObjectVersionTorrent
+          - s3:AbortMultipartUpload
+          - s3:GetBucketRequestPayment
+          - s3:GetAccessPointPolicyStatus
+          - s3:UpdateJobPriority
+          - s3:GetObjectTagging
+          - s3:GetMetricsConfiguration
+          - s3:DeleteBucket
+          - s3:PutBucketVersioning
+          - s3:PutObjectAcl
+          - s3:GetBucketPublicAccessBlock
+          - s3:ListBucketMultipartUploads
+          - s3:PutBucketPublicAccessBlock
+          - s3:PutMetricsConfiguration
+          - s3:UpdateJobStatus
+          - s3:GetBucketVersioning
+          - s3:GetBucketAcl
+          - s3:BypassGovernanceRetention
+          - s3:PutInventoryConfiguration
+          - s3:GetObjectTorrent
+          - s3:ObjectOwnerOverrideToBucketOwner
+          - s3:PutBucketWebsite
+          - s3:PutBucketRequestPayment
+          - s3:PutObjectRetention
+          - s3:GetBucketCORS
+          - s3:PutBucketPolicy
+          - s3:DeleteAccessPointPolicy
+          - s3:GetBucketLocation
+          - s3:GetAccessPointPolicy
+          - s3:ReplicateDelete
+          - s3:GetObjectVersion
+          Resource:
+          - Fn::Sub: arn:aws:s3:::${UserPrefix}-moodle-s3-videos/*
+          - Fn::Sub: arn:aws:s3:::${UserPrefix}-moodle-s3-documents/*
+          - Fn::Sub: arn:aws:s3:::${UserPrefix}-moodle-s3-images/*
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: b10c8abd-6458-42fa-975e-8cdcbd77575a
+  MoodleRDS:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      VPCSecurityGroups:
+      - Fn::GetAtt:
+        - DBSecGroup
+        - GroupId
+      - Ref: DBSecGroup
+      PubliclyAccessible: false
+      DBInstanceIdentifier: MoodleDbInstance
+      DBName: awsmoodle
+      DBInstanceClass: db.t2.micro
+      AllocatedStorage: 20
+      Engine: MySQL
+      EngineVersion: 8.0.16
+      MasterUsername:
+        Ref: DBUsername
+      MasterUserPassword:
+        Ref: DBPassword
+      DBSubnetGroupName:
+        Ref: BDSubnetGroup
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 2b910e38-ae1b-4aef-a8d6-fe0004d4dfb7
+  WebSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName:
+        Fn::Sub: "${UserPrefix}-moodle-ec2-secgrp-web"
+      GroupDescription: Security group for web server
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        Description: Web
+        IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+      - CidrIp: 0.0.0.0/0
+        Description: SSH
+        IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+      - CidrIp: 0.0.0.0/0
+        Description: Web Secure
+        IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 8331f265-896c-4b17-aa86-1f420af9bf52
+  MoodleWebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.small
+      KeyName:
+        Fn::Sub: "${KeypairName}"
+      ImageId: ami-0cfc497d94c6f79b2
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${UserPrefix}-moodle-webserver"
+      SecurityGroupIds:
+      - Ref: WebSecGroup
+      BlockDeviceMappings:
+      - DeviceName: "/dev/xvda"
+        Ebs:
+          VolumeType: standard
+          DeleteOnTermination: 'true'
+          VolumeSize:
+            Fn::Sub: "${MoodleVolumeSize}"
+      SubnetId:
+        Ref: PublicSubnet1
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 14699ed7-b24b-42f6-b276-e118cd2428db
+  MoodleEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId:
+        Ref: MoodleWebServer
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: e0a9ffe2-ee2e-47de-98a8-74c659f8621c
+  DBSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group of DB
+      SecurityGroupIngress:
+      - CidrIp:
+          Fn::Sub:
+          - "${IP}/32"
+          - IP:
+              Fn::GetAtt:
+              - MoodleWebServer
+              - PrivateIp
+        Description: MySQL
+        IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: d581a148-b5f1-4c3b-bfde-ac6b265f4465
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.1.5.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'PrivateSubnet1 / '
+            - Ref: AWS::StackName
+      - Key: SubnetType
+        Value: Private
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 8843b5e4-2324-43e0-adac-21d9b5cc4980
+        a1806463-ba49-40e1-b30a-12b5b3d61bb0:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 90
+            y: 40
+          z: 0
+          embeds: []
+          isassociatedwith:
+          - b10c8abd-6458-42fa-975e-8cdcbd77575a
+        ee3dfe8d-c974-4f11-9d5a-86d4b2dee3e4:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 220
+            y: 130
+          z: 0
+          embeds: []
+          isassociatedwith:
+          - b10c8abd-6458-42fa-975e-8cdcbd77575a
+        2e6973f7-4acc-4c75-a67b-8352ce752726:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 220
+            y: 40
+          z: 0
+          embeds: []
+          isassociatedwith:
+          - ee3dfe8d-c974-4f11-9d5a-86d4b2dee3e4
+        7a054423-40e7-4275-818a-14df7e9229e3:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 30
+            y: 250
+          z: 0
+          embeds: []
+        80f1e7a4-6e69-4363-b6f8-e449bcf1c2de:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 110
+            y: 250
+          z: 0
+          embeds: []
+        d464b3a5-b243-4527-9f45-207c2f3e438c:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 190
+            y: 250
+          z: 0
+          embeds: []
+        b10c8abd-6458-42fa-975e-8cdcbd77575a:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 90
+            y: 130
+          z: 0
+          embeds: []
+        8331f265-896c-4b17-aa86-1f420af9bf52:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 300
+            y: 200
+          z: 1
+          embeds: []
+        14699ed7-b24b-42f6-b276-e118cd2428db:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 210
+            y: 100
+          z: 1
+          embeds: []
+          isassociatedwith:
+          - 8331f265-896c-4b17-aa86-1f420af9bf52
+          - 0d28fa7b-b6a3-41a4-9c5c-5dba8dab7d97
+        e0a9ffe2-ee2e-47de-98a8-74c659f8621c:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 210
+            y: -10
+          z: 1
+          embeds: []
+          isassociatedwith:
+          - 14699ed7-b24b-42f6-b276-e118cd2428db
+        2b910e38-ae1b-4aef-a8d6-fe0004d4dfb7:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 100
+            y: 90
+          z: 1
+          embeds: []
+          isassociatedwith:
+          - d581a148-b5f1-4c3b-bfde-ac6b265f4465
+        d581a148-b5f1-4c3b-bfde-ac6b265f4465:
+          size:
+            width: 60
+            height: 60
+          position:
+            x: 100
+            y: 200
+          z: 0
+          embeds: []
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1b
+      CidrBlock: 10.1.6.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'PrivateSubnet2 / '
+            - Ref: AWS::StackName
+      - Key: SubnetType
+        Value: Private
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: b1451e48-ee24-4060-a4b8-09fa2a34a188
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: PrivateSubnet1
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 6c2bc562-7c6a-4a53-8aef-8080ec1ac7f3
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: PrivateSubnet2
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 0cce55cc-eaff-469e-9e74-d57a2ab6ae41
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.1.1.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'PublicSubnet1 / '
+            - Ref: AWS::StackName
+      - Key: SubnetType
+        Value: Public
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: c21b4045-b7bd-4f15-97c2-2df548589af0
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet1
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 19511fdd-b162-424f-a8ec-eb460fe10279
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'InternetGateway / '
+            - Ref: AWS::StackName
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: e7e0d802-43f9-4e53-ad79-34be48822f16
+  AttachInternetGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: InternetGateway
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 4881e80e-f0d0-4e37-8a4d-27813efc4650
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'PrivateRouteTable / '
+            - Ref: AWS::StackName
+      - Key: Network
+        Value: Private
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 1e273159-7071-48a7-b3d5-51301cde8ae1
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn:
+    - AttachInternetGateway
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: bff1fe4e-1f15-4a6c-9c61-5e935784afcb
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'PublicRouteTable / '
+            - Ref: AWS::StackName
+      - Key: Network
+        Value: Public
+      VpcId:
+        Ref: Vpc
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: bae006e3-d846-422b-b4c8-d01dd7e7febf
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.1.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'Vpc / '
+            - Ref: AWS::StackName
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 7fec0f08-9df4-43e9-8d89-159fd7484897
+  BDSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: RDS Database Subnet Group for Moodle
+      SubnetIds:
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - 'Moodle / '
+            - Ref: AWS::StackName
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 1a5f5074-b381-4de9-a556-65e524794b57
+Metadata:
+  AWS::CloudFormation::Designer:
+    7fec0f08-9df4-43e9-8d89-159fd7484897:
+      size:
+        width: 650
+        height: 380
+      position:
+        x: 260
+        y: 100
+      z: 1
+      embeds:
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - 1e273159-7071-48a7-b3d5-51301cde8ae1
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - b1451e48-ee24-4060-a4b8-09fa2a34a188
+      - 8843b5e4-2324-43e0-adac-21d9b5cc4980
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 8331f265-896c-4b17-aa86-1f420af9bf52
+      - d581a148-b5f1-4c3b-bfde-ac6b265f4465
+    bae006e3-d846-422b-b4c8-d01dd7e7febf:
+      size:
+        width: 90
+        height: 110
+      position:
+        x: 270
+        y: 120
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds:
+      - bff1fe4e-1f15-4a6c-9c61-5e935784afcb
+      iscontainedinside:
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+    1e273159-7071-48a7-b3d5-51301cde8ae1:
+      size:
+        width: 80
+        height: 100
+      position:
+        x: 790
+        y: 290
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds: []
+      iscontainedinside:
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+    e7e0d802-43f9-4e53-ad79-34be48822f16:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 110
+        y: 120
+      z: 0
+      embeds: []
+    4881e80e-f0d0-4e37-8a4d-27813efc4650:
+      source:
+        id: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      target:
+        id: e7e0d802-43f9-4e53-ad79-34be48822f16
+      z: 1
+    bff1fe4e-1f15-4a6c-9c61-5e935784afcb:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 290
+        y: 150
+      z: 3
+      parent: bae006e3-d846-422b-b4c8-d01dd7e7febf
+      embeds: []
+      isassociatedwith:
+      - e7e0d802-43f9-4e53-ad79-34be48822f16
+      iscontainedinside:
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      - bae006e3-d846-422b-b4c8-d01dd7e7febf
+      dependson:
+      - 4881e80e-f0d0-4e37-8a4d-27813efc4650
+    c21b4045-b7bd-4f15-97c2-2df548589af0:
+      size:
+        width: 110
+        height: 210
+      position:
+        x: 400
+        y: 110
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds:
+      - 14699ed7-b24b-42f6-b276-e118cd2428db
+      iscontainedinside:
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+    19511fdd-b162-424f-a8ec-eb460fe10279:
+      source:
+        id: bae006e3-d846-422b-b4c8-d01dd7e7febf
+      target:
+        id: c21b4045-b7bd-4f15-97c2-2df548589af0
+      z: 2
+    b1451e48-ee24-4060-a4b8-09fa2a34a188:
+      size:
+        width: 80
+        height: 90
+      position:
+        x: 670
+        y: 350
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds: []
+      iscontainedinside:
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+    0cce55cc-eaff-469e-9e74-d57a2ab6ae41:
+      source:
+        id: 1e273159-7071-48a7-b3d5-51301cde8ae1
+      target:
+        id: b1451e48-ee24-4060-a4b8-09fa2a34a188
+      z: 2
+    8843b5e4-2324-43e0-adac-21d9b5cc4980:
+      size:
+        width: 80
+        height: 90
+      position:
+        x: 670
+        y: 240
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds: []
+      iscontainedinside:
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+    6c2bc562-7c6a-4a53-8aef-8080ec1ac7f3:
+      source:
+        id: 1e273159-7071-48a7-b3d5-51301cde8ae1
+      target:
+        id: 8843b5e4-2324-43e0-adac-21d9b5cc4980
+      z: 2
+    1a5f5074-b381-4de9-a556-65e524794b57:
+      size:
+        width: 100
+        height: 110
+      position:
+        x: 520
+        y: 310
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds:
+      - 2b910e38-ae1b-4aef-a8d6-fe0004d4dfb7
+      iscontainedinside:
+      - 8843b5e4-2324-43e0-adac-21d9b5cc4980
+      - b1451e48-ee24-4060-a4b8-09fa2a34a188
+    8331f265-896c-4b17-aa86-1f420af9bf52:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 540
+        y: 130
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds: []
+      iscontainedinside:
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+    14699ed7-b24b-42f6-b276-e118cd2428db:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 430
+        y: 220
+      z: 3
+      parent: c21b4045-b7bd-4f15-97c2-2df548589af0
+      embeds: []
+      isassociatedwith:
+      - 8331f265-896c-4b17-aa86-1f420af9bf52
+      iscontainedinside:
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+      - c21b4045-b7bd-4f15-97c2-2df548589af0
+    d581a148-b5f1-4c3b-bfde-ac6b265f4465:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 540
+        y: 210
+      z: 2
+      parent: 7fec0f08-9df4-43e9-8d89-159fd7484897
+      embeds: []
+      iscontainedinside:
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+      - 7fec0f08-9df4-43e9-8d89-159fd7484897
+    e0a9ffe2-ee2e-47de-98a8-74c659f8621c:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 180
+        y: 370
+      z: 0
+      embeds: []
+      isassociatedwith:
+      - 14699ed7-b24b-42f6-b276-e118cd2428db
+    2b910e38-ae1b-4aef-a8d6-fe0004d4dfb7:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 540
+        y: 340
+      z: 3
+      parent: 1a5f5074-b381-4de9-a556-65e524794b57
+      embeds: []
+      isassociatedwith:
+      - d581a148-b5f1-4c3b-bfde-ac6b265f4465
+      iscontainedinside:
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+      - 1a5f5074-b381-4de9-a556-65e524794b57
+    b10c8abd-6458-42fa-975e-8cdcbd77575a:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 670
+        y: 20
+      z: 0
+      embeds: []
+    d464b3a5-b243-4527-9f45-207c2f3e438c:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 520
+        y: 20
+      z: 0
+      embeds: []
+    80f1e7a4-6e69-4363-b6f8-e449bcf1c2de:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 340
+        y: 20
+      z: 0
+      embeds: []
+    7a054423-40e7-4275-818a-14df7e9229e3:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 430
+        y: 20
+      z: 1
+      embeds: []
+    ee3dfe8d-c974-4f11-9d5a-86d4b2dee3e4:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 810
+        y: 20
+      z: 1
+      embeds: []
+      isassociatedwith:
+      - b10c8abd-6458-42fa-975e-8cdcbd77575a
+    2e6973f7-4acc-4c75-a67b-8352ce752726:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 930
+        y: 120
+      z: 1
+      embeds: []
+      isassociatedwith:
+      - ee3dfe8d-c974-4f11-9d5a-86d4b2dee3e4
+    a1806463-ba49-40e1-b30a-12b5b3d61bb0:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 930
+        y: 40
+      z: 1
+      embeds: []
+      isassociatedwith:
+      - ee3dfe8d-c974-4f11-9d5a-86d4b2dee3e4
