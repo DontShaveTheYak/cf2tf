@@ -1,17 +1,16 @@
 import logging
+import re
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Optional
-import re
 
 import click
+from click._termui_impl import ProgressBar
 from git import RemoteProgress
 from git.repo.base import Repo
 from thefuzz import fuzz, process  # type: ignore
 
 import cf2tf.convert
-
-from click._termui_impl import ProgressBar
 
 log = logging.getLogger("cf2tf")
 
@@ -36,7 +35,7 @@ class SearchManager:
         ranking: int
         doc_path: Path
         resource_name, ranking, doc_path = process.extractOne(
-            name.lower(), files, scorer=fuzz.token_sort_ratio
+            name.lower(), files, scorer=fuzz.UWRatio
         )
 
         log.debug(
