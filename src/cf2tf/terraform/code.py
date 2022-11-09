@@ -22,11 +22,9 @@ class SearchManager:
         self.resources = list(docs_path.joinpath("r").glob("*.markdown"))
         self.datas = list(docs_path.joinpath("d").glob("*.markdown"))
 
-    def find(self, name: str) -> Path:
+    def find(self, resource_type: str) -> Path:
 
-        name = name.replace("::", " ").replace("AWS", "")
-
-        name = cf2tf.convert.camel_case_split(name).lower().strip()
+        name = resource_type_to_name(resource_type)
 
         log.debug(f"Searcing for {name} in terraform docs...")
 
@@ -86,6 +84,29 @@ def get_code():
     click.echo(" code has been checked out.")
 
     return repo
+
+
+def resource_type_to_name(resource_type: str) -> str:
+    """Converts a Cloudformation Resource Type into something more search friendly.
+
+    Args:
+        resource_type (str): The Cloudformation resource type.
+
+    Returns:
+        str: A search term that can be used to match resources in the TF docs.
+    """
+
+    search_tokens = resource_type.replace("::", " ").replace("AWS", " ").split(" ")
+
+    for i, token in enumerate(search_tokens):
+        if len(token) >= 4:
+            search_tokens[i] = cf2tf.convert.camel_case_split(token)
+
+    search_term = " ".join(search_tokens).lower().strip()
+
+    log.debug(f"Converted CF type {resource_type} to search term {search_term}.")
+
+    return search_term
 
 
 class CloneProgress(RemoteProgress):

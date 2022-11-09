@@ -1,6 +1,12 @@
 from pathlib import Path
+
 import pytest
-from cf2tf.terraform.code import SearchManager, transform_file_name
+
+from cf2tf.terraform.code import (
+    SearchManager,
+    resource_type_to_name,
+    transform_file_name,
+)
 
 
 @pytest.fixture()
@@ -27,3 +33,19 @@ def test_transform_file_name():
     result = transform_file_name("apigatewayv2_integration.markdown")
 
     assert result == "apigateway v2 integration"
+
+
+type_to_name_tests = [
+    ("AWS::Ec2::Instance", "ec2 instance"),
+    ("AWS::EC2::RouteTable", "ec2 route table"),
+    ("AWS::RDS::DBSubnetGroup", "rds db subnet group"),
+    ("AWS::S3::Bucket", "s3 bucket"),
+]
+
+
+@pytest.mark.parametrize("input, expected", type_to_name_tests)
+def test_resource_type_to_name(input, expected):
+
+    result = resource_type_to_name(input)
+
+    assert result == expected
