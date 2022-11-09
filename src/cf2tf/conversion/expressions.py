@@ -407,6 +407,14 @@ def get_att(template: "TemplateConverter", values: Any):
     log.debug(f"Fn::GetAtt - Parsing attributes for {docs_path}")
     valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
 
+    tf_name = cf2tf.convert.pascal_to_snake(cf_name)
+    tf_type = cf2tf.convert.create_resource_type(docs_path)
+
+    if nested_prop:
+        prop = f"{cf_property}.{'.'.join(nested_prop)}"
+        log.debug(f"Looking up nested attr {prop} for {tf_type}")
+        return nested_attr(tf_name, tf_type, cf_property, nested_prop)
+
     result = cf2tf.convert.matcher(cf_property, valid_arguments + valid_attributes, 50)
 
     if not result:
@@ -416,37 +424,43 @@ def get_att(template: "TemplateConverter", values: Any):
 
     attribute_name, _ = result
 
-    tf_name = cf2tf.convert.pascal_to_snake(cf_name)
-    tf_type = cf2tf.convert.create_resource_type(docs_path)
-
-    if nested_prop:
-
-        prop = f"{cf_property}.{'.'.join(nested_prop)}"
-        log.debug(
-            f"Looking up nested attr {attribute_name} from {cf_property} for {tf_type}"
-        )
-        return nested_attr(tf_name, tf_type, prop, attribute_name)
-
     return LiteralType(f"{tf_type}.{tf_name}.{attribute_name}")
 
 
-def nested_attr(tf_name: str, tf_type: str, cf_prop: str, tf_attr: str):
+def nested_attr(tf_name: str, tf_type: str, cf_attr: str, nested_attr: List[str]):
 
-    if tf_type == "aws_cloudformation_stack" and tf_attr == "outputs":
-        return get_attr_nested_stack(tf_name, tf_type, cf_prop, tf_attr)
+    if len(nested_attr) != 1:
+        raise ValueError(
+            f"Error parsing nested stack output for {cf_attr}.{'.'.join(nested_attr)}"
+        )
 
-    raise ValueError(f"Unable to solve nested GetAttr {cf_prop}")
+    nested_attr_value = nested_attr[0]
+
+    if tf_type == "aws_cloudformation_stack":
+        return get_attr_nested_stack(tf_name, tf_type, cf_attr, nested_attr_value)
+
+    if tf_type == "aws_db_instance":
+        return get_attr_db_instance(tf_name, tf_type, cf_attr, nested_attr_value)
+
+    raise ValueError(
+        f"Unable to solve nested GetAttr {cf_attr} for {tf_name} and {tf_type}"
+    )
 
 
-def get_attr_nested_stack(tf_name: str, tf_type: str, cf_property, tf_attr):
-    items = cf_property.split(".")
+def get_attr_db_instance(tf_name: str, tf_type: str, cf_attr: str, nested_attr: str):
 
-    if len(items) > 2:
-        raise ValueError(f"Error parsing nested stack output for {cf_property}")
+    if cf_attr != "Endpoint":
+        raise ValueError(f"Unable to solve nested GetAttr {tf_name}")
 
-    _, stack_output_name = items
+    return LiteralType(f"{tf_type}.{tf_name}.{nested_attr.lower()}")
 
-    return LiteralType(f"{tf_type}.{tf_name}.{tf_attr}.{stack_output_name}")
+
+def get_attr_nested_stack(tf_name: str, tf_type: str, cf_attr: str, nested_attr: str):
+
+    if cf_attr != "Outputs":
+        raise ValueError(f"Unable to solve nested GetAttr {cf_attr}")
+
+    return LiteralType(f"{tf_type}.{tf_name}.outputs.{nested_attr}")
 
 
 def get_azs(template: "TemplateConverter", region: Any):
@@ -851,7 +865,7 @@ def stack_name_pseduo(template: "TemplateConverter"):
         local_block = hcl2.Locals({})
         template.add_post_block(local_block)
 
-    local_block.arguments["stack_name"] = template.name
+    local_block.arguments["stack_name"] = StringType(template.name)
 
     return LiteralType("local.stack_name")
 
