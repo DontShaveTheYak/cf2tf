@@ -28,7 +28,7 @@ flake8 = "^5.0.4"
 flake8-black = "^0.3.3"
 coverage = {extras = ["toml"], version = "^6.4.2"}
 pytest-cov = "^4.0.0"
-mypy = "^0.990"
+mypy = "^0.991"
 typing-extensions = { version = "^4.3.0", python = "~3.7" }
 
 [build-system]
