@@ -686,6 +686,12 @@ sub_l_tests = [
         no_exception(),
         hcl2.Variable("foo", {"value": "bar"}),
     ),
+    (
+        ["some $foo", {"foo": "bar"}],
+        "some $foo",
+        no_exception(),
+        hcl2.Variable("foo", {"value": "bar"}),
+    ),
     pytest.param(
         ["some ${foo} ${bar}", {"bar": "some string"}],
         "some ${var.foo} some string",
