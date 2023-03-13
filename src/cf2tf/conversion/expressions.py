@@ -748,7 +748,7 @@ def sub_l(template: "TemplateConverter", values: List):
         )
 
     def replace_var(m):
-        var: str = m.group(2)
+        var: str = m.group(1)
 
         if var in local_vars:
             result = local_vars[var]
@@ -758,7 +758,7 @@ def sub_l(template: "TemplateConverter", values: List):
 
         return wrap_in_curlys(result)
 
-    reVar = r"(?!\$\{\!)\$(\w+|\{([^}]*)\})"
+    reVar = r"(?!\$\{\!)\$\{(\w+[^}]*)\}"
 
     if re.search(reVar, source_string):
         return StringType(
