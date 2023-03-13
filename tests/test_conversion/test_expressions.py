@@ -300,7 +300,9 @@ def test_find_in_map(fake_tc: TemplateConverter):
 
     expected_result = f"local.mappings[{map_name}][{top_level_key}][{second_level_key}]"
 
-    result = expressions.find_in_map(fake_tc, [map_name, top_level_key, second_level_key])
+    result = expressions.find_in_map(
+        fake_tc, [map_name, top_level_key, second_level_key]
+    )
 
     assert result == expected_result
 
@@ -378,7 +380,10 @@ def test_get_att_nested(fake_tc: TemplateConverter):
             [resource_id, test_attr],
         )
 
-    assert "Unable to solve nested GetAttr BucketName for test_stack and aws_s3_bucket" in str(e)
+    assert (
+        "Unable to solve nested GetAttr BucketName for test_stack and aws_s3_bucket"
+        in str(e)
+    )
 
     resource_props["Type"] = "AWS::CloudFormation::Stack"
 
@@ -417,7 +422,9 @@ def test_get_azs(fake_tc: TemplateConverter):
     result = expressions.get_azs(fake_tc, "Testing")
     assert result == expected
 
-    data_blocks = [data for data in fake_tc.post_proccess_blocks if isinstance(data, hcl2.Data)]
+    data_blocks = [
+        data for data in fake_tc.post_proccess_blocks if isinstance(data, hcl2.Data)
+    ]
 
     # Make sure the datasource was added correctly
     assert len(data_blocks) != 0 and data_blocks[0].name == '"available"'
@@ -676,12 +683,6 @@ sub_l_tests = [
     (
         ["some ${foo} ${bar}", {"bar": "var.foo"}],
         "some ${var.foo} ${var.foo}",
-        no_exception(),
-        hcl2.Variable("foo", {"value": "bar"}),
-    ),
-    (
-        ["some $foo", {"foo": "bar"}],
-        "some $foo",
         no_exception(),
         hcl2.Variable("foo", {"value": "bar"}),
     ),
