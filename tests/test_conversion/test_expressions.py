@@ -686,6 +686,12 @@ sub_l_tests = [
         no_exception(),
         hcl2.Variable("foo", {"value": "bar"}),
     ),
+    (
+        ["bash $foo and Cloudformation ${foo}", {"foo": "var.bar"}],
+        "bash $foo and Cloudformation ${var.bar}",
+        no_exception(),
+        hcl2.Variable("foo", {"value": "bar"}),
+    ),
     pytest.param(
         ["some ${foo} ${bar}", {"bar": "some string"}],
         "some ${var.foo} some string",
