@@ -3,11 +3,11 @@ name: Tests
 on:
   push:
     branches:
-      - 'master'
+      - "master"
   pull_request:
     paths-ignore:
-      - '.github/workflows/release.yml'
-      - '.github/workflows/pr_checks.yml'
+      - ".github/workflows/release.yml"
+      - ".github/workflows/pr_checks.yml"
 
 jobs:
   single:
@@ -43,6 +43,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3.1.1
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
           fail_ci_if_error: true
 
@@ -51,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.10'] # 3.9 is done in the job above
+        python-version: ["3.7", "3.8", "3.10"] # 3.9 is done in the job above
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
