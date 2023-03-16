@@ -69,13 +69,13 @@ print(f"Latest release is {release_tag}")
 
 if branch == "master":
     print("This release is a final release!")
-    base_tag = latest_tag.split("-")[0]
+    base_tag = latest_tag.split("a")[0]
     bump_rule = "None"
 
-elif "-alpha" in latest_tag:
+elif "a" in latest_tag:
     print("This is an existing prerelease.")
 
-    latest_ver = latest_tag.split("-")[0]
+    latest_ver = latest_tag.split("a")[0]
 
     next_tag = semver.VersionInfo.parse(release_tag)
 
