@@ -687,8 +687,8 @@ sub_l_tests = [
         hcl2.Variable("foo", {"value": "bar"}),
     ),
     (
-        ["bash $foo and Cloudformation ${foo}", {"foo": "bar"}],
-        "bash $foo and Cloudformation bar",
+        ["bash $foo and Cloudformation ${foo}", {"foo": "var.bar"}],
+        "bash $foo and Cloudformation ${var.bar}",
         no_exception(),
         hcl2.Variable("foo", {"value": "bar"}),
     ),
