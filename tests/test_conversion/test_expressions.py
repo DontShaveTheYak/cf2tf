@@ -410,6 +410,58 @@ def test_get_att_nested(fake_tc: TemplateConverter):
     assert result == expected_result
 
 
+def test_get_att_nested_sub_s(fake_tc: TemplateConverter):
+    """Test that nested attributes work from Fn::Sub"""
+
+    # This resource type is fake to invoke an error
+    resource_id = "test_stack"
+    resource_props = {"Type": "AWS::S3::Bucket"}
+
+    fake_tc.manifest["Resources"] = [(resource_id, resource_props)]
+
+    # fake_tc.post_proccess_blocks.append(fake_resource)
+
+    # resource_id = "test_stack"
+    # resource_props = {"Type": "AWS::CloudFormation::Stack"}
+
+    # fake_tc.manifest["Resources"] = [(resource_id, resource_props)]
+
+    test_attr = "BucketName.something"
+
+    # Test that the fake resource does not work
+    with pytest.raises(ValueError) as e:
+        expressions.sub_s(fake_tc, f"${{{resource_id}.{test_attr}}}")
+
+    assert (
+        "Unable to solve nested GetAttr BucketName for test_stack and aws_s3_bucket"
+        in str(e)
+    )
+
+    resource_props["Type"] = "AWS::CloudFormation::Stack"
+
+    fake_tc.manifest["Resources"] = [(resource_id, resource_props)]
+
+    test_attr = "Outputs.a"
+
+    # Test attribute nested too far
+    nested_attr = f"{test_attr}.toofar"
+    with pytest.raises(ValueError) as e:
+        expressions.sub_s(
+            fake_tc,
+            f"${{{resource_id}.{nested_attr}}}",
+        )
+
+    assert f"Error parsing nested stack output for {nested_attr}" in str(e)
+
+    # Test normal result
+
+    expected_result = f"${{aws_cloudformation_stack.{resource_id}.{test_attr.lower()}}}"
+
+    result = expressions.sub_s(fake_tc, f"${{{resource_id}.{test_attr}}}")
+
+    assert result == expected_result
+
+
 def test_get_azs(fake_tc: TemplateConverter):
 
     # Lets test that only valid Cloudformation functions work correctly.
