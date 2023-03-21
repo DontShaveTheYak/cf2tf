@@ -700,7 +700,17 @@ def sub_s(template: "TemplateConverter", value: str):
     def replace_var(m):
         var = m.group(1)
 
-        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
+        if "." in var:
+
+            parts = var.split(".")
+
+            resouce_id = parts[0]
+
+            attributes = ".".join(parts[1:])
+
+            result = get_att(template, [resouce_id, attributes])
+        else:
+            result = ref(template, var)
 
         return wrap_in_curlys(result)
 
@@ -754,7 +764,17 @@ def sub_l(template: "TemplateConverter", values: List):
             result = local_vars[var]
             return wrap_in_curlys(result)
 
-        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
+        if "." in var:
+
+            parts = var.split(".")
+
+            resouce_id = parts[0]
+
+            attributes = ".".join(parts[1:])
+
+            result = get_att(template, [resouce_id, attributes])
+        else:
+            result = ref(template, var)
 
         return wrap_in_curlys(result)
 
