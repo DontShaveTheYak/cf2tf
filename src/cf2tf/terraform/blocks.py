@@ -17,7 +17,6 @@ class Variable(Block):
         super().__init__("variable", (self.name,), arguments, valid_arguments, [])
 
     def write(self):
-
         # Type will be quoted, so we have to unquote it.
         self.arguments["type"] = self.arguments["type"].strip('"')
 

@@ -5,7 +5,6 @@ from cf2tf.terraform import code
 
 
 def tc() -> TemplateConverter:
-
     sm = code.search_manager()
 
     tc = TemplateConverter("test", {}, sm)
@@ -24,7 +23,6 @@ resolve_values_tests = [
 
 @pytest.mark.parametrize("input, expected_result, tc", resolve_values_tests)
 def test_resolve_values(input, expected_result, tc: TemplateConverter):
-
     result = tc.resolve_values(input, {})
 
     assert result == expected_result
