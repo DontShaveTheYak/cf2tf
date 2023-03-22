@@ -22,7 +22,6 @@ class SearchManager:
         self.datas = list(docs_path.joinpath("d").glob("*.markdown"))
 
     def find(self, resource_type: str) -> Path:
-
         name = resource_type_to_name(resource_type)
 
         log.debug(f"Searcing for {name} in terraform docs...")
@@ -63,7 +62,6 @@ def get_code():
     repo_path = temp_dir.joinpath("terraform_src")
 
     if repo_path.exists():
-
         if repo_path.joinpath(".git").exists():
             # todo Need to check to make sure the remote is correct
             click.echo(" existing repo found.")
@@ -126,7 +124,6 @@ class CloneProgress(RemoteProgress):
 
 
 def transform_file_name(og_name: str):
-
     no_extensions = og_name.split(".")[0]
 
     no_underscores = no_extensions.replace("_", " ")

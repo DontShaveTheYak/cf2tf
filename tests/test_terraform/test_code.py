@@ -29,7 +29,6 @@ def test_sm_find(sm: SearchManager):
 
 
 def test_transform_file_name():
-
     result = transform_file_name("apigatewayv2_integration.markdown")
 
     assert result == "apigateway v2 integration"
@@ -45,7 +44,6 @@ type_to_name_tests = [
 
 @pytest.mark.parametrize("input, expected", type_to_name_tests)
 def test_resource_type_to_name(input, expected):
-
     result = resource_type_to_name(input)
 
     assert result == expected
