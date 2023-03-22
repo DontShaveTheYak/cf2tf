@@ -12,7 +12,6 @@ from cf2tf.terraform.hcl2.primitive import StringType
 
 @pytest.fixture(scope="session")
 def fake_tc() -> TemplateConverter:
-
     sm = code.search_manager()
 
     tc = TemplateConverter("test", {}, sm)
@@ -39,7 +38,6 @@ base64_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", base64_tests)
 def test_base64(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -67,7 +65,6 @@ cidr_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", cidr_tests)
 def test_cidr(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -95,7 +92,6 @@ and_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", and_tests)
 def test_and(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -128,7 +124,6 @@ equals_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", equals_tests)
 def test_equals(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -162,7 +157,6 @@ if_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", if_tests)
 def test_if(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -195,7 +189,6 @@ not_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", not_tests)
 def test_not(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -233,7 +226,6 @@ or_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", or_tests)
 def test_or_(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -255,7 +247,6 @@ condition_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", condition_tests)
 def test_condition(input, expected_result, expectation):
-
     # fake template that is not used
     fake_tc: TemplateConverter = None
 
@@ -269,7 +260,6 @@ def test_condition(input, expected_result, expectation):
 
 
 def test_find_in_map(fake_tc: TemplateConverter):
-
     # Test that it will only take a list
     with pytest.raises(TypeError) as type_error:
         expressions.find_in_map(fake_tc, {})
@@ -308,7 +298,6 @@ def test_find_in_map(fake_tc: TemplateConverter):
 
 
 def test_get_att(fake_tc: TemplateConverter):
-
     # Test that it will only take a list
     with pytest.raises(TypeError) as type_error:
         expressions.get_att(fake_tc, {})
@@ -463,7 +452,6 @@ def test_get_att_nested_sub_s(fake_tc: TemplateConverter):
 
 
 def test_get_azs(fake_tc: TemplateConverter):
-
     # Lets test that only valid Cloudformation functions work correctly.
     with pytest.raises(TypeError):
         not_valid_region: List[Any] = []
@@ -496,7 +484,6 @@ join_tests = [
 
 @pytest.mark.parametrize("fake_tc, expression, expected", join_tests)
 def test_join(fake_tc, expression, expected):
-
     result = expressions.join(fake_tc, expression)
 
     assert result == expected
@@ -549,7 +536,6 @@ ref_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", ref_tests)
 def test_ref(input, expected_result, expectation):
-
     cf_manifest = {
         "Parameters": [("foo", {"a": "a"})],
         "Resources": [("bar", {"Type": "AWS::S3::Bucket"})],
@@ -569,7 +555,6 @@ def test_ref(input, expected_result, expectation):
 
 
 def test_ref_conditional():
-
     cf_manifest = {
         "Parameters": [("foo", {"a": "a"})],
         "Resources": [("bar", {"Type": "AWS::S3::Bucket", "Condition": "Foo"})],
@@ -605,7 +590,6 @@ select_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation", select_tests)
 def test_select(input, expected_result, expectation):
-
     cf_manifest = {
         "Parameters": [("foo", {"a": "a"})],
         "Resources": [("bar", {"Type": "AWS::S3::Bucket"})],
@@ -626,7 +610,6 @@ def test_select(input, expected_result, expectation):
 
 
 def test_split(fake_tc):
-
     cf_expression = [",", '"A,B,C"']
 
     expected = 'split(",", "A,B,C")'
@@ -649,7 +632,6 @@ sub_tests: Any = [
 
 @pytest.mark.parametrize("input, expected_result, expectation, block", sub_tests)
 def test_sub(input, expected_result, expectation, block):
-
     cf_manifest = {
         "Parameters": [("foo", {"a": "a"})],
         "Resources": [("bar", {"Type": "AWS::S3::Bucket"})],
@@ -700,7 +682,6 @@ sub_s_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation, block", sub_s_tests)
 def test_sub_s(input, expected_result, expectation, block):
-
     cf_manifest = {
         "Parameters": [("foo", {"a": "a"})],
         "Resources": [("bar", {"Type": "AWS::S3::Bucket"})],
@@ -759,7 +740,6 @@ sub_l_tests = [
 
 @pytest.mark.parametrize("input, expected_result, expectation, block", sub_l_tests)
 def test_sub_l(input, expected_result, expectation, block):
-
     cf_manifest = {
         "Parameters": [("foo", {"a": "a"})],
         "Resources": [("bar", {"Type": "AWS::S3::Bucket"})],
@@ -780,6 +760,5 @@ def test_sub_l(input, expected_result, expectation, block):
 
 
 def test_transform(fake_tc):
-
     with pytest.raises(Exception):
         _ = expressions.transform(fake_tc, "Any Value")
