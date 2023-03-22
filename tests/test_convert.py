@@ -6,7 +6,7 @@ import pytest
 
 import cf2tf.convert as convert
 from cf2tf.terraform import code, doc_file
-from cf2tf.terraform.blocks import Data, Locals, Output
+from cf2tf.terraform.blocks import Data, Locals, Output, Block
 from cf2tf.terraform.hcl2.primitive import StringType
 
 
@@ -39,7 +39,6 @@ props_to_args_tests = [
 def test_props_to_args(
     props: Dict[str, Any], expected_args: Dict[str, Any], docs_path: Path
 ):
-
     valid_arguments, _ = doc_file.parse_attributes(docs_path)
 
     converted_args = convert.props_to_args(props, valid_arguments, docs_path)
@@ -62,7 +61,6 @@ camel_case_tests = [
 
 @pytest.mark.parametrize("input, expected", camel_case_tests)
 def test_camel_case_split(input: str, expected: str):
-
     result = convert.camel_case_split(input)
 
     assert result == expected
@@ -77,7 +75,6 @@ convert_resources_tests = [
 
 @pytest.mark.parametrize("tc, cf_resource, expectation", convert_resources_tests)
 def test_convert_resource(tc: convert.TemplateConverter, cf_resource, expectation):
-
     with expectation:
         tc.convert_resources([cf_resource])
 
@@ -137,7 +134,6 @@ def test_get_block_by_type():
 
 
 def test_perform_resource_overrides():
-
     template = tc()
 
     fake_params = {"foo": StringType("bar")}
@@ -155,3 +151,68 @@ def test_perform_resource_overrides():
     assert "AccessControl" not in result
     assert "acl" in result
     assert "private" == result["acl"]
+
+
+parse_subsection_tests = [
+    # (tf_arg_name, cf_props, docs_path, expected_type, expectation)
+    (
+        "ingress",
+        {"FromPort": "foo"},
+        Path("/tmp/terraform_src/website/docs/r/security_group.html.markdown"),
+        Block,
+        no_exception(),
+    ),
+    (
+        "foo",
+        {"FromPort": "foo"},
+        Path("/tmp/terraform_src/website/docs/r/security_group.html.markdown"),
+        Dict,
+        no_exception(),
+    ),
+    (
+        "Import",
+        [],
+        Path("/tmp/terraform_src/website/docs/r/security_group.html.markdown"),
+        list,
+        no_exception(),
+    ),
+    (
+        "ingress",
+        (),
+        Path("/tmp/terraform_src/website/docs/r/security_group.html.markdown"),
+        Block,
+        pytest.raises(TypeError),
+    ),
+    (
+        "ingress",
+        [{"FromPort": "foo"}, {"ToPort": "bar"}],
+        Path("/tmp/terraform_src/website/docs/r/security_group.html.markdown"),
+        list,
+        no_exception(),
+    ),
+    (
+        "ingress",
+        [
+            [{"FromPort": "foo"}, {"ToPort": "bar"}]
+        ],  # This is invalid, but shouldn't raise an error
+        Path("/tmp/terraform_src/website/docs/r/security_group.html.markdown"),
+        list,
+        no_exception(),
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "tf_arg_name, cf_props, docs_path, expected_type, expectation",
+    parse_subsection_tests,
+)
+def test_parse_subection(
+    tf_arg_name: str,
+    cf_props: Dict[str, Any],
+    docs_path: Path,
+    expected_type: Any,
+    expectation,
+):
+    with expectation:
+        result = convert.parse_subsection(tf_arg_name, cf_props, docs_path)  # type: ignore
+        assert isinstance(result[1], expected_type)
