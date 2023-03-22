@@ -67,7 +67,6 @@ class TemplateConverter:
             return value
 
     def add_post_block(self, block: Block):
-
         block_refs = [block.base_ref() for block in self.post_proccess_blocks]
 
         log.debug(block_refs)
@@ -76,7 +75,6 @@ class TemplateConverter:
             self.post_proccess_blocks.insert(0, block)
 
     def get_block_by_type(self, block_type: Type[Block]):
-
         for block in self.post_proccess_blocks:
             if isinstance(block, block_type):
                 return block
@@ -99,9 +97,7 @@ class TemplateConverter:
         return config.Configuration(tf_resources)
 
     def parse_template(self):
-
         for section in self.valid_sections:
-
             if section not in self.cf_template:
                 log.debug(
                     f"Ignoring section {section} not found in {self.valid_sections}"
@@ -119,9 +115,7 @@ class TemplateConverter:
     def resource_lookup(
         self, resource_name: str, sections: List[str]
     ) -> Optional[Dict[str, Any]]:
-
         for section in sections:
-
             section_resources = self.manifest.get(section)
 
             if section_resources:
@@ -134,7 +128,6 @@ class TemplateConverter:
         return None
 
     def convert_to_tf(self, manifest: Manifest):
-
         tf_resources: List[Block] = []
 
         for section in list(manifest):
@@ -165,11 +158,9 @@ class TemplateConverter:
         """
 
         if isinstance(data, dict):
-
             key: str
 
             for key in list(data):
-
                 value = data[key]
 
                 if key == "Ref":
@@ -213,7 +204,6 @@ class TemplateConverter:
             raise Exception(f"Unknown value {data}, in resolve function.")
 
     def convert_parameters(self, parameters: CFResources):
-
         tf_vars: List[Variable] = []
 
         for param_name, param_value in parameters:
@@ -247,7 +237,6 @@ class TemplateConverter:
         return tf_vars
 
     def convert_mappings(self, mappings: CFResources):
-
         log.debug("Converting Mappings to Terraform Locals block.")
 
         dict_mappings = dict(mappings)
@@ -263,7 +252,6 @@ class TemplateConverter:
         return []
 
     def convert_conditions(self, conditions: CFResources):
-
         log.debug("Converting Conditions to Terraform Locals block.")
 
         dict_conditons = dict(conditions)
@@ -285,11 +273,9 @@ class TemplateConverter:
         return []
 
     def convert_resources(self, resources: CFResources):
-
         tf_resources: List[Resource] = []
 
         for resource_id, resource_values in resources:
-
             log.debug(f"Converting Cloudformation resource {resource_id} to Terraform.")
 
             tf_name = pascal_to_snake(resource_id)
@@ -323,7 +309,6 @@ class TemplateConverter:
             arguments = MapType(properties)
 
             if properties:
-
                 log.debug(
                     "Converting the intrinsic functions to Terraform expressions..."
                 )
@@ -361,7 +346,6 @@ class TemplateConverter:
         return tf_resources
 
     def convert_outputs(self, outputs: CFResources):
-
         tf_outputs: List[Output] = []
 
         for output_id, output_props in outputs:
@@ -436,7 +420,6 @@ def pascal_to_snake(name: str):
 
 
 def matcher(search_term: str, search_items: List[str], score_cutoff=0):
-
     result: Optional[Tuple[str, int]] = process.extractOne(
         # search_term, search_items, scorer=fuzz.token_sort_ratio
         search_term,
@@ -448,7 +431,6 @@ def matcher(search_term: str, search_items: List[str], score_cutoff=0):
 
 
 def camel_case_split(text: str) -> str:
-
     items = re.findall(r"[A-Z\d](?:[a-z]+|\d|[A-Z]*(?=[A-Z]|$))", text)
 
     return " ".join(items) if items else text
@@ -461,11 +443,9 @@ def create_resource_type(doc_path: Path):
 
 # todo Not used yet, but I think it will be in a future refactoring
 def contains_functions(self, data: Dict[str, Any]):
-
     functions = ["Ref", "Fn::"]
 
     for key in list(data):
-
         if key in functions:
             return True
 
@@ -477,14 +457,12 @@ def props_to_args(
     valid_tf_arguments: List[str],
     docs_path: Path,
 ):
-
     # Search works better if we split the words apart, but we have to put it back together later
     search_items = [item.replace("_", " ") for item in valid_tf_arguments]
 
     converted_attrs: Dict[str, AllTypes] = {}
 
     for prop_name, prop_value in cf_props.items():
-
         tf_arg_name, tf_arg_value = convert_prop_to_arg(
             prop_name, prop_value, search_items, docs_path
         )
@@ -549,7 +527,6 @@ def parse_subsection(
     section_name = find_section(arg_name, docs_path)
 
     if not section_name:
-
         if isinstance(prop_value, dict):
             log.debug(f"{arg_name} has Map value but no subsection in {docs_path}")
             return arg_name, prop_value
@@ -575,11 +552,16 @@ def parse_subsection(
     # in some cases its key -> list in Cloudformation and Block, Block, Block in Terraform. This function
     # will need to be modified so it returns something capable of expressing this relationship.
     if isinstance(prop_value, list):
+        sub_args: List[TerraformType] = []
 
-        sub_args = [
-            props_to_args(sub_props, valid_sub_args, docs_path)
-            for sub_props in prop_value
-        ]
+        for sub_props in prop_value:
+            if not isinstance(sub_props, Dict):
+                sub_args.append(CommentType(sub_props))
+
+            try:
+                sub_args.append(props_to_args(sub_props, valid_sub_args, docs_path))
+            except:  # noqa: E722
+                sub_args.append(CommentType(sub_props))
 
         return arg_name, ListType(sub_args)
 
@@ -610,7 +592,6 @@ def add_space():
 def perform_resource_overrides(
     tf_type: str, params: Dict[str, TerraformType], tc: TemplateConverter
 ):
-
     log.debug("Overiding params for {tf_type}")
     if tf_type not in OVERRIDE_DISPATCH:
         return params
@@ -618,7 +599,6 @@ def perform_resource_overrides(
     param_overrides = OVERRIDE_DISPATCH[tf_type]
 
     for param, override in param_overrides.items():
-
         if param in params:
             params = override(tc, params)
 
