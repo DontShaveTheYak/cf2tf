@@ -42,7 +42,6 @@ class StringType(str, TerraformType):
         return self.render()
 
     def render(self, _=0):
-
         return f'"{self.value}"'
 
 

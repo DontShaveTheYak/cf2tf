@@ -38,7 +38,6 @@ def s3_bucket_acl(_tc: "TemplateConverter", params: CFParams) -> CFParams:
 
 
 def s3_bucket_policy(_tc: "TemplateConverter", params: CFParams) -> CFParams:
-
     policy_value = params["PolicyDocument"]
 
     params["PolicyDocument"] = LiteralType(f"jsonencode({policy_value.render(4)}\n  )")

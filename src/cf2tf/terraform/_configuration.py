@@ -14,5 +14,4 @@ class Configuration:
         self.resources = resources
 
     def save(self, output: Output):
-
         output.save(self.resources)

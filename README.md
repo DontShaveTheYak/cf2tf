@@ -152,7 +152,7 @@ Levi - [@shady_cuz](https://twitter.com/shady_cuz)
 [python-shield]: https://img.shields.io/pypi/pyversions/cf2tf?style=for-the-badge
 [version-shield]: https://img.shields.io/pypi/v/cf2tf?label=latest&style=for-the-badge
 [pypi-url]: https://pypi.org/project/cf2tf/
-[test-shield]: https://img.shields.io/github/workflow/status/DontShaveTheYak/cf2tf/Tests?label=Tests&style=for-the-badge
+[test-shield]: https://img.shields.io/github/actions/workflow/status/DontShaveTheYak/cf2tf/test.yml?label=Tests&style=for-the-badge
 [test-url]: https://github.com/DontShaveTheYak/cf2tf/actions?query=workflow%3ATests+branch%3Amaster
 [codecov-shield]: https://img.shields.io/codecov/c/gh/DontShaveTheYak/cf2tf/master?color=green&style=for-the-badge&token=bfF18q99Fl
 [codecov-url]: https://codecov.io/gh/DontShaveTheYak/cf2tf

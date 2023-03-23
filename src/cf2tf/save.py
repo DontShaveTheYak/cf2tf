@@ -27,7 +27,6 @@ class Output(Protocol):
 
 class Directory:
     def __init__(self, directory: str) -> None:
-
         output_dir = Path(directory)
 
         if not output_dir.exists():
@@ -86,7 +85,6 @@ class StdOut:
 
 
 def create_writer(output: Optional[str]) -> Output:
-
     writer: Output
 
     if output:

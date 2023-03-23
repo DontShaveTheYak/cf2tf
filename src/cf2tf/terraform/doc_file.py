@@ -9,9 +9,7 @@ log = logging.getLogger("cf2tf")
 
 
 def parse_attributes(docs_path: Path):
-
     with open(docs_path) as file:
-
         arguments = parse_section("Argument Reference", file)
 
         attributes = parse_section("Attributes Reference", file)
@@ -20,17 +18,14 @@ def parse_attributes(docs_path: Path):
 
 
 def read_section(docs_path: Path, section_name: str):
-
     items: List[str]
     with open(docs_path) as file:
-
         items = parse_section(section_name, file)
 
     return items
 
 
 def parse_section(name: str, file: TextIOWrapper):
-
     cur_pos = file.tell()
 
     section_location = find_section(name, file)
@@ -51,7 +46,6 @@ def parse_items(file: TextIOWrapper):
     attributes: List[str] = []
 
     while True:
-
         # We need the  current postion incase we run into the next section
         cur_pos = file.tell()
 
@@ -67,7 +61,6 @@ def parse_items(file: TextIOWrapper):
 
         # These should be the attributes we are after
         if line[0] == "*":
-
             regex = r"`([\w\.]+)`"
 
             match = re.search(regex, line)
@@ -88,11 +81,9 @@ def parse_items(file: TextIOWrapper):
 
 
 def all_sections(docs_path: Path):
-
     sections: List[str] = []
 
     with open(docs_path) as file:
-
         while True:
             line = file.readline()
 
@@ -107,9 +98,7 @@ def all_sections(docs_path: Path):
 
 
 def find_section(name: str, file: TextIOWrapper):
-
     while True:
-
         cur_pos = file.tell()
 
         line = file.readline()

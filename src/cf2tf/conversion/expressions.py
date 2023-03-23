@@ -428,7 +428,6 @@ def get_att(template: "TemplateConverter", values: Any):
 
 
 def nested_attr(tf_name: str, tf_type: str, cf_attr: str, nested_attr: List[str]):
-
     if len(nested_attr) != 1:
         raise ValueError(
             f"Error parsing nested stack output for {cf_attr}.{'.'.join(nested_attr)}"
@@ -448,7 +447,6 @@ def nested_attr(tf_name: str, tf_type: str, cf_attr: str, nested_attr: List[str]
 
 
 def get_attr_db_instance(tf_name: str, tf_type: str, cf_attr: str, nested_attr: str):
-
     if cf_attr != "Endpoint":
         raise ValueError(f"Unable to solve nested GetAttr {tf_name}")
 
@@ -456,7 +454,6 @@ def get_attr_db_instance(tf_name: str, tf_type: str, cf_attr: str, nested_attr: 
 
 
 def get_attr_nested_stack(tf_name: str, tf_type: str, cf_attr: str, nested_attr: str):
-
     if cf_attr != "Outputs":
         raise ValueError(f"Unable to solve nested GetAttr {cf_attr}")
 
@@ -502,14 +499,22 @@ def get_azs(template: "TemplateConverter", region: Any):
 
 # todo Handle functions that are not applicable to terraform.
 def import_value(template: "TemplateConverter", name: Any):
-    # I'm not sure how to handle this but I think if any exception is encountered while
-    # converting cf expressions to terraform, we should just comment out the entire line.
+    if not isinstance(name, str):
+        raise TypeError(
+            f"The import value type was expected to be string not {type(name)}"
+        )
 
-    # On second thought it probably makes sense to turn this into a input variable
-
-    raise Exception(
-        "Fn::Import Is Cloudformation native and unable to be converted to a Terraform expression."
+    var = hcl2.Variable(
+        name,
+        {
+            "description": StringType(
+                "This variable was an imported value in the Cloudformation Template."
+            )
+        },
     )
+
+    template.add_post_block(var)
+    return LiteralType(var.base_ref())
 
 
 def join(_tc: "TemplateConverter", values: Any):
@@ -560,7 +565,6 @@ def join(_tc: "TemplateConverter", values: Any):
 
 # todo I'm not sure this is that useful
 def _terraform_list(items: List[Any]):
-
     # .join() doesn't call `_str_` on items
     items = [str(item) for item in items]
 
@@ -700,7 +704,16 @@ def sub_s(template: "TemplateConverter", value: str):
     def replace_var(m):
         var = m.group(1)
 
-        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
+        if "." in var:
+            parts = var.split(".")
+
+            resouce_id = parts[0]
+
+            attributes = ".".join(parts[1:])
+
+            result = get_att(template, [resouce_id, attributes])
+        else:
+            result = ref(template, var)
 
         return wrap_in_curlys(result)
 
@@ -748,17 +761,26 @@ def sub_l(template: "TemplateConverter", values: List):
         )
 
     def replace_var(m):
-        var: str = m.group(2)
+        var: str = m.group(1)
 
         if var in local_vars:
             result = local_vars[var]
             return wrap_in_curlys(result)
 
-        result = get_att(template, var.split(".")) if "." in var else ref(template, var)
+        if "." in var:
+            parts = var.split(".")
+
+            resouce_id = parts[0]
+
+            attributes = ".".join(parts[1:])
+
+            result = get_att(template, [resouce_id, attributes])
+        else:
+            result = ref(template, var)
 
         return wrap_in_curlys(result)
 
-    reVar = r"(?!\$\{\!)\$(\w+|\{([^}]*)\})"
+    reVar = r"(?!\$\{\!)\$\{(\w+[^}]*)\}"
 
     if re.search(reVar, source_string):
         return StringType(
@@ -793,7 +815,6 @@ def ref(template: "TemplateConverter", var_name: str):
     """
 
     if "AWS::" in var_name:
-
         return handle_pseduo_var(template, var_name)
 
     cf_param = template.resource_lookup(var_name, ["Parameters"])
@@ -846,7 +867,6 @@ def partition_pseduo(template: "TemplateConverter"):
 
 
 def no_value_pseduo(_: "TemplateConverter"):
-
     return NullType()
 
 
@@ -894,11 +914,9 @@ pseduo_dispatch: Pseduo_Dispatch = {
 
 
 def handle_pseduo_var(template: "TemplateConverter", pseudo_name: str):
-
     pseudo_type = pseudo_name.replace("AWS::", "")
 
     if pseudo_type not in pseduo_dispatch:
-
         raise ValueError(f"Unable to process pseudo var {pseudo_name}.")
 
     pseduo_resolver: Pseduo_Resolver = pseduo_dispatch[pseudo_type]

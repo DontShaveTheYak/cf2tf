@@ -50,7 +50,6 @@ class Block:
         return self.render()
 
     def ref(self, attribute_name: Optional[str] = None):
-
         count = "[0]" if "count" in self.arguments else ""
 
         resource_name = f"{self.base_ref()}{count}"
@@ -62,7 +61,6 @@ class Block:
         return LiteralType(f"{resource_name}.{attribute}")
 
     def render(self, indent=0):
-
         brace_space = " " * indent
 
         indent += 2
@@ -81,7 +79,6 @@ class Block:
 
 
 def render_arguments(args: Arguments, indent=0):
-
     if not args:
         return ""
 
@@ -90,9 +87,7 @@ def render_arguments(args: Arguments, indent=0):
     results = []
 
     for name, value in args.items():
-
         try:
-
             if isinstance(value, (Block, CommentType)):
                 results.append(value.render(indent))
                 continue
