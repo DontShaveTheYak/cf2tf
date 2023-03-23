@@ -11,7 +11,7 @@ log = logging.getLogger("cf2tf")
 
 class Variable(Block):
     def __init__(self, name: str, arguments: Dict[str, Any]) -> None:
-        self.name = f'"{name}"'
+        self.name = name
 
         valid_arguments = ["description", "type", "default"]
         super().__init__("variable", (self.name,), arguments, valid_arguments, [])
@@ -21,6 +21,11 @@ class Variable(Block):
         self.arguments["type"] = self.arguments["type"].strip('"')
 
         return super().write()
+
+    def base_ref(self):
+        ref = super().base_ref()
+
+        return ref.replace("variable", "var")
 
 
 class Locals(Block):
