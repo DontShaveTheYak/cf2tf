@@ -470,6 +470,12 @@ def test_get_azs(fake_tc: TemplateConverter):
     assert len(data_blocks) != 0 and data_blocks[0].name == '"available"'
 
 
+def test_import_value(fake_tc: TemplateConverter):
+    result = expressions.import_value(fake_tc, "Some-CF-Import-Name")
+
+    assert result == "var.Some-CF-Import-Name"
+
+
 join_tests = [
     (None, ['"-"', "var.something"], 'join("-", var.something)'),
     (None, ['"-"', ["A", "B", "C"]], 'join("-", [A, B, C])'),

@@ -499,14 +499,22 @@ def get_azs(template: "TemplateConverter", region: Any):
 
 # todo Handle functions that are not applicable to terraform.
 def import_value(template: "TemplateConverter", name: Any):
-    # I'm not sure how to handle this but I think if any exception is encountered while
-    # converting cf expressions to terraform, we should just comment out the entire line.
+    if not isinstance(name, str):
+        raise TypeError(
+            f"The import value type was expected to be string not {type(name)}"
+        )
 
-    # On second thought it probably makes sense to turn this into a input variable
-
-    raise Exception(
-        "Fn::Import Is Cloudformation native and unable to be converted to a Terraform expression."
+    var = hcl2.Variable(
+        name,
+        {
+            "description": StringType(
+                "This variable was an imported value in the Cloudformation Template."
+            )
+        },
     )
+
+    template.add_post_block(var)
+    return LiteralType(var.base_ref())
 
 
 def join(_tc: "TemplateConverter", values: Any):
