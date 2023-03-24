@@ -24,7 +24,7 @@ pytest = "^7.1.2"
 
 [tool.poetry.dev-dependencies]
 black = "^23.0.0"
-flake8 = "^5.0.4"
+flake8 = "^6.0.0"
 flake8-black = "^0.3.3"
 coverage = {extras = ["toml"], version = "^7.0.0"}
 pytest-cov = "^4.0.0"
