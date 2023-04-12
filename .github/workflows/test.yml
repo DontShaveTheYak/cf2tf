@@ -15,7 +15,7 @@ jobs:
     name: Python 3.9
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.5.0
+        uses: actions/checkout@v3.5.1
 
       - name: Setup Latest Python
         uses: actions/setup-python@v4.5.0
@@ -56,7 +56,7 @@ jobs:
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.5.0
+        uses: actions/checkout@v3.5.1
 
       - name: Setup Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4.5.0
