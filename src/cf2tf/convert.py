@@ -10,7 +10,7 @@ from thefuzz import process  # type: ignore
 import cf2tf.conversion.expressions as functions
 import cf2tf.terraform._configuration as config
 import cf2tf.terraform.doc_file as doc_file
-from cf2tf.conversion.overrides import OVERRIDE_DISPATCH
+from cf2tf.conversion.overrides import OVERRIDE_DISPATCH, GLOBAL_OVERRIDES
 from cf2tf.terraform.blocks import Block, Locals, Output, Resource, Variable
 from cf2tf.terraform.hcl2 import AllTypes
 from cf2tf.terraform.hcl2.complex import ListType, MapType
@@ -323,6 +323,10 @@ class TemplateConverter:
                     tf_type, resolved_values, self
                 )
 
+                overrided_values = perform_global_overrides(
+                    tf_type, overrided_values, self
+                )
+
                 log.debug("Converting property names to argument names...")
 
                 arguments = props_to_args(overrided_values, valid_arguments, docs_path)
@@ -599,6 +603,18 @@ def perform_resource_overrides(
     param_overrides = OVERRIDE_DISPATCH[tf_type]
 
     for param, override in param_overrides.items():
+        if param in params:
+            params = override(tc, params)
+
+    return params
+
+
+def perform_global_overrides(
+    tf_type: str, params: Dict[str, TerraformType], tc: TemplateConverter
+):
+    log.debug("Performing global overrides for {tf_type}")
+
+    for param, override in GLOBAL_OVERRIDES.items():
         if param in params:
             params = override(tc, params)
 

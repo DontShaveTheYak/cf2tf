@@ -153,6 +153,22 @@ def test_perform_resource_overrides():
     assert "private" == result["acl"]
 
 
+def test_perform_global_overrides():
+    template = tc()
+
+    params = {"Tags": [{"Key": "foo", "Value": "bar"}]}
+
+    result = convert.perform_global_overrides("aws_s3_bucket", params, template)
+
+    assert result is params
+
+    assert "Tags" not in result
+    assert "tags" in result
+    assert "foo" in result["tags"]
+    assert "bar" == result["tags"]["foo"]
+    assert isinstance(result["tags"], dict)
+
+
 parse_subsection_tests = [
     # (tf_arg_name, cf_props, docs_path, expected_type, expectation)
     (
