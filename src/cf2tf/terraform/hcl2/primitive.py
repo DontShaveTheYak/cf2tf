@@ -18,7 +18,7 @@ class TerraformType(Protocol):
     value: Any
 
     def __str__(self) -> str:
-        return self.render()
+        return self.render(0)
 
     @abstractclassmethod
     def render(self, indent: int) -> str:

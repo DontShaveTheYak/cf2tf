@@ -760,7 +760,7 @@ def sub_l(template: "TemplateConverter", values: List):
             "Fn::Sub - The first value must be a String and the second a Map."
         )
 
-    def replace_var(m):
+    def replace_var(m) -> str:
         var: str = m.group(1)
 
         if var in local_vars:
