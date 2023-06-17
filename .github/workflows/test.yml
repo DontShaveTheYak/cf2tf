@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.10"] # 3.9 is done in the job above
+        python-version: ["3.8", "3.10"] # 3.9 is done in the job above
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
