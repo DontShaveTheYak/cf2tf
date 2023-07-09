@@ -35,7 +35,7 @@ class SearchManager:
         ranking: int
         doc_path: Path
         resource_name, ranking, doc_path = process.extractOne(
-            name.lower(), files, scorer=fuzz.UWRatio
+            name.lower(), files, scorer=fuzz.token_sort_ratio
         )
 
         log.debug(
