@@ -828,10 +828,11 @@ def ref(template: "TemplateConverter", var_name: str):
     if cf_resource:
         cf_resource_type = cf_resource.get("Type", "")
         docs_path = template.search_manager.find(cf_resource_type)
-        _, valid_attributes = doc_file.parse_attributes(docs_path)
+        valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
         tf_name = cf2tf.convert.pascal_to_snake(var_name)
         tf_type = cf2tf.convert.create_resource_type(docs_path)
-        first_attr = next(iter(valid_attributes))
+
+        first_attr = valid_attributes[0] if valid_attributes else valid_arguments[0]
         conditional = cf_resource.get("Condition")
 
         if conditional is not None:
