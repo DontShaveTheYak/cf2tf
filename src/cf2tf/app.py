@@ -14,7 +14,7 @@ log = logging.getLogger("cf2tf")
 click_log.basic_config(log)
 
 
-@click.command()
+@click.command()  # type: ignore
 @click.version_option()
 @click.option("--output", "-o", type=click.Path(exists=False))
 @click_log.simple_verbosity_option(log)
@@ -48,4 +48,4 @@ def cli(output: Optional[str], template_path: str):
 
 
 if __name__ == "__main__":
-    cli()
+    cli()  # type: ignore

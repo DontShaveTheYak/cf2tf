@@ -760,7 +760,7 @@ def sub_l(template: "TemplateConverter", values: List):
             "Fn::Sub - The first value must be a String and the second a Map."
         )
 
-    def replace_var(m):
+    def replace_var(m) -> str:
         var: str = m.group(1)
 
         if var in local_vars:
@@ -828,10 +828,11 @@ def ref(template: "TemplateConverter", var_name: str):
     if cf_resource:
         cf_resource_type = cf_resource.get("Type", "")
         docs_path = template.search_manager.find(cf_resource_type)
-        _, valid_attributes = doc_file.parse_attributes(docs_path)
+        valid_arguments, valid_attributes = doc_file.parse_attributes(docs_path)
         tf_name = cf2tf.convert.pascal_to_snake(var_name)
         tf_type = cf2tf.convert.create_resource_type(docs_path)
-        first_attr = next(iter(valid_attributes))
+
+        first_attr = valid_attributes[0] if valid_attributes else valid_arguments[0]
         conditional = cf_resource.get("Condition")
 
         if conditional is not None:
@@ -976,7 +977,11 @@ ALLOWED_NESTED_CONDITIONS: Dispatch = {
 # functions that are allowed to be nested inside it.
 ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
     "Fn::And": ALLOWED_NESTED_CONDITIONS,
-    "Fn::Equals": {**ALLOWED_NESTED_CONDITIONS, "Fn::Join": join},
+    "Fn::Equals": {
+        **ALLOWED_NESTED_CONDITIONS,
+        "Fn::Join": join,
+        "Fn::Select": select,
+    },
     "Fn::If": {
         "Fn::Base64": base64,
         "Fn::FindInMap": find_in_map,

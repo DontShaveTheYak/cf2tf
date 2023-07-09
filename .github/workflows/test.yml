@@ -15,10 +15,10 @@ jobs:
     name: Python 3.9
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.4.0
+        uses: actions/checkout@v3.5.3
 
       - name: Setup Latest Python
-        uses: actions/setup-python@v4.5.0
+        uses: actions/setup-python@v4.6.1
         with:
           python-version: 3.9
           architecture: x64
@@ -41,7 +41,7 @@ jobs:
         run: coverage xml --fail-under=0
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.1.1
+        uses: codecov/codecov-action@v3.1.4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
@@ -52,14 +52,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.10"] # 3.9 is done in the job above
+        python-version: ["3.8", "3.10"] # 3.9 is done in the job above
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.4.0
+        uses: actions/checkout@v3.5.3
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4.5.0
+        uses: actions/setup-python@v4.6.1
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64

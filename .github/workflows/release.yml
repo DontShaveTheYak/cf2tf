@@ -17,12 +17,12 @@ jobs:
     steps:
 
       - name: Checkout Code
-        uses: actions/checkout@v3.4.0
+        uses: actions/checkout@v3.5.3
         with:
           fetch-depth: 0
 
       - name: Setup Python 3.9
-        uses: actions/setup-python@v4.5.0
+        uses: actions/setup-python@v4.6.1
         with:
           python-version: '3.9'
           architecture: x64
@@ -72,10 +72,10 @@ jobs:
     needs: tag
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.4.0
+        uses: actions/checkout@v3.5.3
 
       - name: Setup Python 3.9
-        uses: actions/setup-python@v4.5.0
+        uses: actions/setup-python@v4.6.1
         with:
           python-version: '3.9'
           architecture: x64
@@ -104,7 +104,7 @@ jobs:
     needs: [tag, publish]
     steps:
       - name: Create Draft Release
-        uses: release-drafter/release-drafter@v5.23.0
+        uses: release-drafter/release-drafter@v5.24.0
         if: github.base_ref == 'develop'
         with:
           tag: ${{needs.tag.outputs.tag}}
@@ -114,7 +114,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
-        uses: release-drafter/release-drafter@v5.23.0
+        uses: release-drafter/release-drafter@v5.24.0
         if: github.base_ref == 'master'
         with:
           tag: ${{needs.tag.outputs.tag}}

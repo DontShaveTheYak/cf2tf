@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Callable, Dict
 
 from cf2tf.terraform.hcl2.custom import LiteralType
 from cf2tf.terraform.hcl2.primitive import NullType, StringType, TerraformType
+from cf2tf.terraform.hcl2.complex import ListType, MapType
 
 if TYPE_CHECKING:
     from cf2tf.convert import TemplateConverter
@@ -45,7 +46,23 @@ def s3_bucket_policy(_tc: "TemplateConverter", params: CFParams) -> CFParams:
     return params
 
 
+def tag_conversion(_tc: "TemplateConverter", params: CFParams) -> CFParams:
+    if isinstance(params["Tags"], dict):
+        return params
+
+    orginal_tags: ListType = params["Tags"]  # type: ignore
+
+    new_tags = {LiteralType(tag["Key"]): tag["Value"] for tag in orginal_tags}
+
+    del params["Tags"]
+    params["tags"] = MapType(new_tags)
+
+    return params
+
+
 OVERRIDE_DISPATCH: ResourceOverride = {
     "aws_s3_bucket": {"AccessControl": s3_bucket_acl},
     "aws_s3_bucket_policy": {"PolicyDocument": s3_bucket_policy},
 }
+
+GLOBAL_OVERRIDES: ParamOverride = {"Tags": tag_conversion}

@@ -3,11 +3,12 @@ import re
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Optional
+from shutil import rmtree
 
 import click
 from click._termui_impl import ProgressBar
 from git import RemoteProgress
-from git.repo.base import Repo
+from git.repo.base import Repo, InvalidGitRepositoryError
 from thefuzz import fuzz, process  # type: ignore
 
 import cf2tf.convert
@@ -34,7 +35,7 @@ class SearchManager:
         ranking: int
         doc_path: Path
         resource_name, ranking, doc_path = process.extractOne(
-            name.lower(), files, scorer=fuzz.UWRatio
+            name.lower(), files, scorer=fuzz.token_sort_ratio
         )
 
         log.debug(
@@ -57,16 +58,19 @@ def search_manager():
     return SearchManager(docs_path)
 
 
-def get_code():
+def get_code() -> Repo:
     temp_dir = Path(gettempdir())
     repo_path = temp_dir.joinpath("terraform_src")
 
-    if repo_path.exists():
-        if repo_path.joinpath(".git").exists():
-            # todo Need to check to make sure the remote is correct
-            click.echo(" existing repo found.")
-            repo = Repo(repo_path)
-            return repo
+    try:
+        existing_repo = repo_from_existing(repo_path)
+
+        if existing_repo:
+            return existing_repo
+
+    except InvalidGitRepositoryError:
+        rmtree(repo_path)
+        repo_path.rmdir()
 
     print(f"// Cloning Terraform src code to {repo_path}...", end="")
 
@@ -76,11 +80,21 @@ def get_code():
         "https://github.com/hashicorp/terraform-provider-aws.git",
         repo_path,
         depth=1,
-        progress=CloneProgress(),
+        progress=CloneProgress(),  # type: ignore
     )
     click.echo(" code has been checked out.")
 
     return repo
+
+
+def repo_from_existing(repo_path: Path) -> Optional[Repo]:
+    if repo_path.exists():
+        if repo_path.joinpath(".git").exists():
+            repo = Repo(repo_path)
+            click.echo(f"// Existing Terraform src code found at {repo_path}.")
+            return repo
+
+    return None
 
 
 def resource_type_to_name(resource_type: str) -> str:
