@@ -10,9 +10,15 @@ log = logging.getLogger("cf2tf")
 
 def parse_attributes(docs_path: Path):
     with open(docs_path) as file:
-        arguments = parse_section("Argument Reference", file)
+        try:
+            arguments = parse_section("Argument Reference", file)
+        except Exception as e:
+            raise Exception(f"Unable to find arguments in {file.name}") from e
 
-        attributes = parse_section("Attributes Reference", file)
+        try:
+            attributes = parse_section("Attributes Reference", file)
+        except Exception as e:
+            raise Exception(f"Unable to find attributes in {file.name}") from e
 
     return (arguments, attributes)
 
@@ -61,7 +67,7 @@ def parse_items(file: TextIOWrapper):
 
         # These should be the attributes we are after
         if line[0] == "*":
-            regex = r"`([\w\.]+)`"
+            regex = r"`([\w.*]+)`"
 
             match = re.search(regex, line)
 
