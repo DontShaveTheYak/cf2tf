@@ -47,6 +47,9 @@ def s3_bucket_policy(_tc: "TemplateConverter", params: CFParams) -> CFParams:
 
 
 def tag_conversion(_tc: "TemplateConverter", params: CFParams) -> CFParams:
+    if isinstance(params["Tags"], dict):
+        return params
+
     orginal_tags: ListType = params["Tags"]  # type: ignore
 
     new_tags = {LiteralType(tag["Key"]): tag["Value"] for tag in orginal_tags}
