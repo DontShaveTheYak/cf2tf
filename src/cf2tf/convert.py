@@ -140,7 +140,7 @@ class TemplateConverter:
 
         return tf_resources
 
-    def resolve_values(
+    def resolve_values(  # noqa: max-complexity=13
         self,
         data: Any,
         allowed_func: functions.Dispatch,
@@ -181,7 +181,10 @@ class TemplateConverter:
                     value, functions.ALLOWED_FUNCTIONS[key], key, inside_function=True
                 )
 
-                return allowed_func[key](self, value)
+                try:
+                    return allowed_func[key](self, value)
+                except Exception:
+                    return CommentType(f"Unable to resolve {key} with value: {value}")
 
             return MapType(data)
         elif isinstance(data, list):
