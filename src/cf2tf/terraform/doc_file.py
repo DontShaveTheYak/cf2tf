@@ -16,7 +16,7 @@ def parse_attributes(docs_path: Path):
             raise Exception(f"Unable to find arguments in {file.name}") from e
 
         try:
-            attributes = parse_section("Attributes Reference", file)
+            attributes = parse_section("Attribute Reference", file)
         except Exception as e:
             raise Exception(f"Unable to find attributes in {file.name}") from e
 
