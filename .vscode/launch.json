@@ -13,7 +13,7 @@
       "args": [
         "-v",
         "debug",
-        "tests/data/log_bucket.yaml"
+        "tests/data/templates/log_bucket.yaml"
       ],
       "justMyCode": true
     }
