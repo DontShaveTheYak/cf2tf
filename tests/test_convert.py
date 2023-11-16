@@ -20,6 +20,12 @@ def tc():
     return tc
 
 
+def test_parse_attributes():
+    arguments, attributes = doc_file.parse_attributes(
+        "/tmp/terraform_src/website/docs/r/rds_cluster.html.markdown"
+    )
+
+
 props_to_args_tests = [
     # (props, expected_args, docs_path)
     (
