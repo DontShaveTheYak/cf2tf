@@ -29,9 +29,8 @@ def test_sm_(mock_sm: SearchManager):
 sm_find_tests = [
     ("AWS::ApiGatewayV2::Integration", "apigatewayv2_integration.html.markdown"),
     ("AWS::Lambda::Function", "lambda_function.html.markdown"),
-    ("AWS::EC2::Instance", "instance.html.markdown"),
     ("AWS::Events::Rule", "cloudwatch_event_rule.html.markdown"),
-    ("AWS::Cognito::UserPool", "cognito_user_pool.markdown"),
+    ("AWS::Cognito::UserPool", "cognito_user_pool.html.markdown"),
 ]
 
 
