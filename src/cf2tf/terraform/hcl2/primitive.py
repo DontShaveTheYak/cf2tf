@@ -89,4 +89,24 @@ class NullType(int, TerraformType):
         return __x == self.value
 
 
-PrimitiveTypes = Union[StringType, NumberType, NullType]
+class BooleanType(int, TerraformType):
+    """A value that represents a boolean."""
+
+    def __init__(self, value: bool) -> None:
+        """Default constructor
+
+        Args:
+            value (bool): The value for this Terraform type.
+        """
+        super().__init__()
+
+        self.value: bool = value
+
+    def __str__(self) -> str:
+        return self.render()
+
+    def render(self, _=0):
+        return str(self.value).lower()
+
+
+PrimitiveTypes = Union[StringType, NumberType, NullType, BooleanType]
