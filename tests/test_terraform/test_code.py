@@ -31,7 +31,7 @@ sm_find_tests = [
     ("AWS::Lambda::Function", "lambda_function.html.markdown"),
     ("AWS::EC2::Instance", "instance.html.markdown"),
     ("AWS::Events::Rule", "cloudwatch_event_rule.html.markdown"),
-    ("AWS::Cognito::UserPool", "cognito_user_pool.markdown"),
+    ("AWS::Cognito::UserPool", "cognito_user_pool.html.markdown"),
 ]
 
 
