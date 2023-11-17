@@ -32,16 +32,25 @@ def read_section(docs_path: Path, section_name: str):
 
 
 def parse_section(name: str, file: TextIOWrapper):
-    cur_pos = file.tell()
+    """
+    Parses items from a specific section in a file.
 
-    section_location = find_section(name, file)
+    This function first finds the specified section in the file using the `find_section` function.
+    Then, it parses the items in the found section using the `parse_items` function and returns a list of these items.
 
-    if not section_location:
-        file.seek(cur_pos)
-        return []
+    Args:
+        name (str): The name of the section to parse items from.
+        file (TextIOWrapper): The file to parse items from.
+
+    Returns:
+        List[str]: A list of items found in the section. If no items are found, an empty list is returned.
+    """
+    # Throws an exception if the section is not found
+    find_section(name, file)
 
     items = parse_items(file)
 
+    # sometimes we dont find items and thats ok
     if not items:
         log.debug(f"Unable to find items in section {name} of {file.name}")
 
@@ -49,6 +58,20 @@ def parse_section(name: str, file: TextIOWrapper):
 
 
 def parse_items(file: TextIOWrapper):
+    """
+    Parses attributes from a section in a file.
+
+    This function reads through a file line by line until it finds a line that starts with a "*" character,
+    which indicates an attribute. It then extracts the attribute using a regular expression and adds it to a list.
+    The function stops parsing attributes when it encounters an empty line or a line that starts with a "#" character,
+    which indicates a new section.
+
+    Args:
+        file (TextIOWrapper): The file to parse attributes from.
+
+    Returns:
+        List[str]: A list of attributes found in the section. If no attributes are found, an empty list is returned.
+    """
     attributes: List[str] = []
 
     while True:
@@ -72,7 +95,8 @@ def parse_items(file: TextIOWrapper):
             match = re.search(regex, line)
 
             if not match:
-                raise Exception(f"Did not find an item to parse in {line}")
+                log.debug(f"Did not find an item to parse in {line}")
+                continue
 
             attribute = match.group(1)
 
@@ -104,6 +128,22 @@ def all_sections(docs_path: Path):
 
 
 def find_section(name: str, file: TextIOWrapper):
+    """Searches for a markdown section in a file and returns the position of the section.
+
+    This function reads through a file line by line until it finds a line that starts with a "#" character
+    and contains the specified name. It then returns the position of the next line in the file.
+    If the end of the file is reached without finding the section, it logs a debug message and raises an exception.
+
+    Args:
+        name (str): The name of the section to find
+        file (TextIOWrapper): The file to search
+
+    Raises:
+        Exception: If the section is not found
+
+    Returns:
+        int: The position of the next line after the section
+    """
     while True:
         cur_pos = file.tell()
 
@@ -113,6 +153,4 @@ def find_section(name: str, file: TextIOWrapper):
             return cur_pos + 1
 
         if not line:
-            log.debug(f"Unable to find section {name} in {file.name}")
-            raise Exception()
-            return None
+            raise Exception(f"Unable to find section {name} in {file.name}")
