@@ -10,12 +10,17 @@ from thefuzz import process  # type: ignore
 import cf2tf.conversion.expressions as functions
 import cf2tf.terraform._configuration as config
 import cf2tf.terraform.doc_file as doc_file
-from cf2tf.conversion.overrides import OVERRIDE_DISPATCH, GLOBAL_OVERRIDES
+from cf2tf.conversion.overrides import GLOBAL_OVERRIDES, OVERRIDE_DISPATCH
 from cf2tf.terraform.blocks import Block, Locals, Output, Resource, Variable
 from cf2tf.terraform.hcl2 import AllTypes
 from cf2tf.terraform.hcl2.complex import ListType, MapType
 from cf2tf.terraform.hcl2.custom import CommentType, LiteralType
-from cf2tf.terraform.hcl2.primitive import NumberType, StringType, TerraformType
+from cf2tf.terraform.hcl2.primitive import (
+    BooleanType,
+    NumberType,
+    StringType,
+    TerraformType,
+)
 
 if TYPE_CHECKING:
     from cf2tf.terraform.code import SearchManager
@@ -196,6 +201,8 @@ class TemplateConverter:
             ]
 
             return ListType(resolved_list_values)
+        elif isinstance(data, bool):
+            return BooleanType(data)
         elif isinstance(data, str):
             return StringType(data)
         elif isinstance(data, (int, float)):
