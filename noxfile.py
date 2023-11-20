@@ -35,21 +35,21 @@ nox.options.sessions = (
 locations = "src", "tests", "noxfile.py"
 
 
-@session(python=python_versions[0])
+@session(python=python_versions[1])
 def black(session):
     args = session.posargs or locations
     session.install("black")
     session.run("black", *args)
 
 
-@session(python=python_versions[0])
+@session(python=python_versions[1])
 def lint(session):
     args = session.posargs or locations
     session.install("flake8")
     session.run("flake8", *args)
 
 
-@session(python=python_versions[0])
+@session(python=python_versions[1])
 def mypy(session: Session) -> None:
     """Type-check using mypy."""
     args = session.posargs or [
@@ -77,7 +77,7 @@ def tests(session: Session) -> None:
             session.notify("coverage", posargs=[])
 
 
-@session(python=python_versions[0])
+@session(python=python_versions[1])
 def coverage(session: Session) -> None:
     """Produce the coverage report."""
     args = session.posargs or ["report"]
