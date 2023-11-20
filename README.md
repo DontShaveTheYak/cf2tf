@@ -125,7 +125,7 @@ Contributions are what make the open-source community such an amazing place to l
 
 
 
-This project uses poetry to manage dependencies and pre-commit to run formatting, linting and tests. You will need to have both installed to your system as well as python 3.12.
+This project uses poetry to manage dependencies and pre-commit to run formatting, linting and tests. You will need to have both installed to your system as well as python 3.11.
 
 1. Fork the Project
 2. Setup the environment.
