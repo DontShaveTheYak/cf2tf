@@ -9,7 +9,7 @@ repos:
       language: python
       language_version: python3
       types: ["python"]
-      args: ["-rs", "black", "-p", "3.9"]
+      args: ["-rs", "black", "-p", "3.11"]
       require_serial: true
       additional_dependencies: []
     - id: lint
@@ -18,7 +18,7 @@ repos:
       language: python
       language_version: python3
       types: ["python"]
-      args: ["-rs", "lint", "-p", "3.9"]
+      args: ["-rs", "lint", "-p", "3.11"]
       require_serial: true
       additional_dependencies: []
     - id: mypy
@@ -27,7 +27,7 @@ repos:
       language: python
       language_version: python3
       types: ["python"]
-      args: ["-rs", "mypy", "-p", "3.9"]
+      args: ["-rs", "mypy", "-p", "3.11"]
       require_serial: true
       additional_dependencies: []
     - id: tests
@@ -36,6 +36,6 @@ repos:
       language: python
       language_version: python3
       types: ["python"]
-      args: ["-rs", "tests", "-p", "3.9"]
+      args: ["-rs", "tests", "-p", "3.11"]
       require_serial: true
       additional_dependencies: []
