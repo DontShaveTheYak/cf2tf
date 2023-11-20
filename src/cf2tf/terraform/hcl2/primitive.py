@@ -4,6 +4,7 @@ from typing import Any, Union
 try:
     from typing import Protocol
 except ImportError:
+    # Shouldnt be needed, but just in case
     # Python 3.6 and 3.7
     from typing_extensions import Protocol  # type: ignore
 
