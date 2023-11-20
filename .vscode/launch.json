@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Current File",
+      "name": "cf2tf: Test Template",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/cf2tf/app.py",
