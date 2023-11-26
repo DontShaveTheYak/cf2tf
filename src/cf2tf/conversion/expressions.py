@@ -1033,6 +1033,7 @@ ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
         "Ref": ref,
     },
     "Fn::Select": {
+        "Fn::Cidr": cidr,
         "Fn::FindInMap": find_in_map,
         "Fn::GetAtt": get_att,
         "Fn::GetAZs": get_azs,
