@@ -1,0 +1,2885 @@
+{
+  "Description": "(SO0013) Live Streaming on AWS Solution v4.2.1",
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "LIVE STREAM SOURCE"
+          },
+          "Parameters": [
+            "InputType"
+          ]
+        },
+        {
+          "Label": {
+            "default": "URL_PULL and RTMP_PULL CONFIGURATION"
+          },
+          "Parameters": [
+            "PriPullUrl",
+            "PriPullUser",
+            "PriPullPass",
+            "SecPullUrl",
+            "SecPullUser",
+            "SecPullPass"
+          ]
+        },
+        {
+          "Label": {
+            "default": "RTP_PUSH / RTMP_PUSH CONFIGURATION"
+          },
+          "Parameters": [
+            "InputCIDR"
+          ]
+        },
+        {
+          "Label": {
+            "default": "MEDIACONNECT CONFIGURATION"
+          },
+          "Parameters": [
+            "PriMediaConnectArn",
+            "SecMediaConnectArn"
+          ]
+        },
+        {
+          "Label": {
+            "default": "ENCODING OPTIONS"
+          },
+          "Parameters": [
+            "EncodingProfile",
+            "ChannelStart"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "InputType": {
+          "default": "Source Input Type"
+        },
+        "EncodingProfile": {
+          "default": "Encoding Profile"
+        },
+        "InputCIDR": {
+          "default": "Input CIDR Block"
+        },
+        "PriPullUrl": {
+          "default": "Primary Source URL"
+        },
+        "PriPullUser": {
+          "default": "Primary Source Username"
+        },
+        "PriPullPass": {
+          "default": "Primary Source Password"
+        },
+        "SecPullUrl": {
+          "default": "Secondary Source URL"
+        },
+        "SecPullUser": {
+          "default": "Secondary Source Username"
+        },
+        "SecPullPass": {
+          "default": "Secondary Source Password"
+        },
+        "PriMediaConnectArn": {
+          "default": "Primary MediaConnect Arn"
+        },
+        "SecMediaConnectArn": {
+          "default": "Secondary MediaConnect Arn"
+        },
+        "ChannelStart": {
+          "default": "Start MediaLive Channel"
+        }
+      }
+    }
+  },
+  "Parameters": {
+    "InputType": {
+      "Type": "String",
+      "Default": "URL_PULL",
+      "AllowedValues": [
+        "RTP_PUSH",
+        "RTMP_PUSH",
+        "RTMP_PULL",
+        "URL_PULL",
+        "MEDIACONNECT"
+      ],
+      "Description": "Specify the input type for MediaLive. Detailed instructions for each input type can be found here https://docs.aws.amazon.com/solutions/latest/live-streaming-on-aws/appendix-a.html"
+    },
+    "EncodingProfile": {
+      "Type": "String",
+      "Default": "HD-720p",
+      "AllowedValues": [
+        "HD-1080p",
+        "HD-720p",
+        "SD-540p"
+      ],
+      "Description": "Select an encoding profile. HD 1080p [1920x1080, 1280x720, 960x540, 768x432, 640x360, 512x288] HD 720p [1280x720, 960x540, 768x432, 640x360, 512x288] SD 540p [960x540, 768x432, 640x360, 512x288]  See the implementation guide for details https://docs.aws.amazon.com/solutions/latest/live-streaming/considerations.html"
+    },
+    "InputCIDR": {
+      "Type": "String",
+      "Default": "",
+      "Description": "For RTP and RTMP PUSH input types ONLY, specify the CIDR Block for the MediaLive SecurityGroup. Input security group restricts access to the input and prevents unauthorized third parties from pushing content into a channel that is associated with that input."
+    },
+    "PriPullUrl": {
+      "Type": "String",
+      "Default": "https://d15an60oaeed9r.cloudfront.net/live_stream_v2/sports_reel_with_markers.m3u8",
+      "Description": "For URL_PULL and RTMP_PULL input types ONLY, specify the primary source URL."
+    },
+    "PriPullUser": {
+      "Type": "String",
+      "Default": "",
+      "Description": "For URL_PULL and RTMP_PULL input types ONLY, specify a username for the primary source URL if basic authentication is enabled on the source."
+    },
+    "PriPullPass": {
+      "Type": "String",
+      "Default": "",
+      "Description": "For URL_PULL and RTMP_PULL input types ONLY, specify a password for the primary source URL if basic authentication is enabled on the source.",
+      "NoEcho": true
+    },
+    "SecPullUrl": {
+      "Type": "String",
+      "Default": "https://d3h5srgm8b0t83.cloudfront.net/live_stream_v2/sports_reel_with_markers.m3u8",
+      "Description": "For URL_PULL and RTMP_PULL input types ONLY, specify the secondary source URL, this should be a HTTP or HTTPS link to the stream manifest file."
+    },
+    "SecPullUser": {
+      "Type": "String",
+      "Default": "",
+      "Description": "For URL_PULL and RTMP_PULL input types ONLY, specify a username for the secondary source URL if basic authentication is enabled on the source."
+    },
+    "SecPullPass": {
+      "Type": "String",
+      "Default": "",
+      "Description": "For URL_PULL and RTMP_PULL input types ONLY, specify a password for the secondary source URL if basic authentication is enabled on the source.",
+      "NoEcho": true
+    },
+    "PriMediaConnectArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "For MediaConnect Input type ONLY, specify the ARN for MediaConnect as the primary source. This flow has to be in a different availability zone as the secondary source."
+    },
+    "SecMediaConnectArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "For MediaConnect Input type ONLY, specify the ARN for MediaConnect as the secondary source. This flow has to be in a different availability zone as the primary source."
+    },
+    "ChannelStart": {
+      "Type": "String",
+      "Default": "No",
+      "AllowedValues": [
+        "Yes",
+        "No"
+      ],
+      "Description": "If your source is ready to stream, select true. This will start the MediaLive Channel as part of the deployment. If you select false, you will need to manually start the MediaLive Channel when your source is ready."
+    }
+  },
+  "Mappings": {
+    "AnonymizedData": {
+      "SendAnonymizedData": {
+        "Data": "Yes"
+      }
+    }
+  },
+  "Resources": {
+    "MediaLiveRole1149D189": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "medialive.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaLiveRole/Resource"
+      }
+    },
+    "MediaLivePolicy09DE3C9B": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "mediastore:DeleteObject",
+                "mediastore:DescribeObject",
+                "mediastore:GetObject",
+                "mediastore:ListContainers",
+                "mediastore:PutObject"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":mediastore:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": [
+                "mediaconnect:ManagedDescribeFlow",
+                "mediaconnect:ManagedAddOutput",
+                "mediaconnect:ManagedRemoveOutput"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":mediaconnect:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": [
+                "ec2:DescribeSubnets",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:CreateNetworkInterface",
+                "ec2:CreateNetworkInterfacePermission",
+                "ec2:DeleteNetworkInterface",
+                "ec2:DeleteNetworkInterfacePermission",
+                "ec2:DescribeSecurityGroups"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":ec2:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams",
+                "logs:DescribeLogGroups"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":logs:*:*:*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": "mediapackage:DescribeChannel",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":mediapackage:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":channels/*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "MediaLivePolicy09DE3C9B",
+        "Roles": [
+          {
+            "Ref": "MediaLiveRole1149D189"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaLivePolicy/Resource",
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Resource ARNs are not generated at the time of policy creation",
+              "id": "AwsSolutions-IAM5"
+            }
+          ]
+        }
+      }
+    },
+    "MediaPackageRoleEFC5C05A": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "mediapackage.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "F38",
+              "reason": "Resource level permission is not supported by getRole"
+            },
+            {
+              "id": "W11",
+              "reason": "* is required for MediaPackage CDN Authorization: https://docs.aws.amazon.com/mediapackage/latest/ug/setting-up-create-trust-rel-policy-cdn.html"
+            }
+          ]
+        }
+      }
+    },
+    "CustomResourceRoleAB1EF463": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CustomResourceRole/Resource"
+      }
+    },
+    "CustomResourcePolicy79526710": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "medialive:DescribeInputSecurityGroup",
+                "medialive:CreateInputSecurityGroup",
+                "medialive:DescribeInput",
+                "medialive:CreateInput",
+                "medialive:DeleteInput",
+                "medialive:StopChannel",
+                "medialive:CreateChannel",
+                "medialive:DeleteChannel",
+                "medialive:DeleteInputSecurityGroup",
+                "medialive:DescribeChannel",
+                "medialive:StartChannel",
+                "medialive:CreateTags",
+                "medialive:DeleteTags"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":medialive:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": [
+                "mediapackage:CreateChannel",
+                "mediapackage:DeleteChannel",
+                "mediapackage:ListOriginEndpoints",
+                "mediapackage:DeleteOriginEndpoint",
+                "mediapackage:CreateOriginEndpoint",
+                "mediapackage:TagResource",
+                "mediapackage:UntagResource"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":mediapackage:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":logs:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":log-group:/aws/lambda/*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": "ssm:PutParameter",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":ssm:",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    ":parameter/*"
+                  ]
+                ]
+              }
+            },
+            {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MediaLiveRole1149D189",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "MediaPackageRoleEFC5C05A",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "CustomResourcePolicy79526710",
+        "Roles": [
+          {
+            "Ref": "CustomResourceRoleAB1EF463"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CustomResourcePolicy/Resource",
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Resource ARNs are not generated at the time of policy creation",
+              "id": "AwsSolutions-IAM5"
+            }
+          ]
+        }
+      }
+    },
+    "CustomResource8CDCD7A7": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "solutions-${AWS::Region}"
+          },
+          "S3Key": "live-streaming-on-aws/v4.2.1/assete5cb04e3258d0d09befa44c70b305dc5f1cea7680ece701e4175fa6798a489e1.zip"
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomResourceRoleAB1EF463",
+            "Arn"
+          ]
+        },
+        "Description": "Used to deploy custom resources and send AnonymizedData",
+        "Environment": {
+          "Variables": {
+            "SOLUTION_IDENTIFIER": "AwsSolution/SO0013/v4.2.1"
+          }
+        },
+        "Handler": "index.handler",
+        "Runtime": "nodejs18.x",
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ],
+        "Timeout": 30
+      },
+      "DependsOn": [
+        "CustomResourcePolicy79526710",
+        "CustomResourceRoleAB1EF463"
+      ],
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W58",
+              "reason": "Invalid warning: function has access to cloudwatch"
+            },
+            {
+              "id": "W89",
+              "reason": "This CustomResource does not need to be deployed inside a VPC"
+            },
+            {
+              "id": "W92",
+              "reason": "This CustomResource does not need to define ReservedConcurrentExecutions to reserve simultaneous executions"
+            }
+          ]
+        }
+      }
+    },
+    "UUID": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "UUID"
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/UUID/Default"
+      }
+    },
+    "CdnSecret32008E6A": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "CDN authorization string value for ",
+              {
+                "Ref": "AWS::StackName"
+              },
+              " Live Streaming Deployment"
+            ]
+          ]
+        },
+        "GenerateSecretString": {
+          "GenerateStringKey": "password",
+          "SecretStringTemplate": {
+            "Fn::Join": [
+              "",
+              [
+                "{\"MediaPackageCDNIdentifier\":\"",
+                {
+                  "Fn::GetAtt": [
+                    "UUID",
+                    "UUID"
+                  ]
+                },
+                "\"}"
+              ]
+            ]
+          }
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W77",
+              "reason": "Using default keys as this is uuid and not a password. MediaPackage CDN Authorization: https://docs.aws.amazon.com/mediapackage/latest/ug/setting-up-create-trust-rel-policy-cdn.html"
+            }
+          ]
+        },
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "MediaPackage requires a static value and is not integrated with CDN for automatic rotation: https://docs.aws.amazon.com/mediapackage/latest/ug/cdn-auth-setup.html#cdn-aut-setup-cdn",
+              "id": "AwsSolutions-SMG4"
+            }
+          ]
+        }
+      }
+    },
+    "MediaPackagePolicyCBD9468D": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+                "secretsmanager:ListSecrets",
+                "secretsmanager:ListSecretVersionIds"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "CdnSecret32008E6A"
+              }
+            },
+            {
+              "Action": [
+                "iam:GetRole",
+                "iam:PassRole"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "MediaPackagePolicyCBD9468D",
+        "Roles": [
+          {
+            "Ref": "MediaPackageRoleEFC5C05A"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "F39",
+              "reason": "Resource level permission is not supported by getRole"
+            },
+            {
+              "id": "W12",
+              "reason": "* is required for MediaPackage CDN Authorization: https://docs.aws.amazon.com/mediapackage/latest/ug/setting-up-create-trust-rel-policy-cdn.html"
+            }
+          ]
+        },
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "* is required for MediaPackage CDN Authorization: https://docs.aws.amazon.com/mediapackage/latest/ug/setting-up-create-trust-rel-policy-cdn.html",
+              "id": "AwsSolutions-IAM5"
+            }
+          ]
+        }
+      }
+    },
+    "MediaLiveInput": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "MediaLiveInput",
+        "StreamName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-livestream"
+            ]
+          ]
+        },
+        "Type": {
+          "Ref": "InputType"
+        },
+        "Cidr": {
+          "Ref": "InputCIDR"
+        },
+        "PriUrl": {
+          "Ref": "PriPullUrl"
+        },
+        "PriUser": {
+          "Ref": "PriPullUser"
+        },
+        "PriPass": {
+          "Ref": "PriPullPass"
+        },
+        "SecUrl": {
+          "Ref": "SecPullUrl"
+        },
+        "SecUser": {
+          "Ref": "SecPullUser"
+        },
+        "SecPass": {
+          "Ref": "SecPullPass"
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "MediaLiveRole1149D189",
+            "Arn"
+          ]
+        },
+        "PriMediaConnectArn": {
+          "Ref": "PriMediaConnectArn"
+        },
+        "SecMediaConnectArn": {
+          "Ref": "SecMediaConnectArn"
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaLiveInput/Default"
+      }
+    },
+    "MediaLiveChannel": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "MediaLiveChannel",
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-livestream"
+            ]
+          ]
+        },
+        "EncodingProfile": {
+          "Ref": "EncodingProfile"
+        },
+        "Codec": "AVC",
+        "Role": {
+          "Fn::GetAtt": [
+            "MediaLiveRole1149D189",
+            "Arn"
+          ]
+        },
+        "InputId": {
+          "Fn::GetAtt": [
+            "MediaLiveInput",
+            "Id"
+          ]
+        },
+        "Type": {
+          "Ref": "InputType"
+        },
+        "MediaPackageChannelId": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-livestream"
+            ]
+          ]
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaLiveChannel/Default"
+      }
+    },
+    "MediaLiveChannelStart": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "MediaLiveChannelStart",
+        "ChannelId": {
+          "Fn::GetAtt": [
+            "MediaLiveChannel",
+            "ChannelId"
+          ]
+        },
+        "ChannelStart": {
+          "Ref": "ChannelStart"
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaLiveChannelStart/Default"
+      }
+    },
+    "MediaPackageChannel": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "MediaPackageChannel",
+        "ChannelId": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-livestream"
+            ]
+          ]
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaPackageChannel/Default"
+      }
+    },
+    "MediaPackageHlsEndpoint": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "MediaPackageEndPoint",
+        "EndPoint": "HLS",
+        "ChannelId": {
+          "Fn::GetAtt": [
+            "MediaPackageChannel",
+            "ChannelId"
+          ]
+        },
+        "SecretsRoleArn": {
+          "Fn::GetAtt": [
+            "MediaPackageRoleEFC5C05A",
+            "Arn"
+          ]
+        },
+        "CdnIdentifierSecret": {
+          "Ref": "CdnSecret32008E6A"
+        }
+      },
+      "DependsOn": [
+        "MediaPackagePolicyCBD9468D"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaPackageHlsEndpoint/Default"
+      }
+    },
+    "MediaPackageDashEndpoint": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "MediaPackageEndPoint",
+        "EndPoint": "DASH",
+        "ChannelId": {
+          "Fn::GetAtt": [
+            "MediaPackageChannel",
+            "ChannelId"
+          ]
+        },
+        "SecretsRoleArn": {
+          "Fn::GetAtt": [
+            "MediaPackageRoleEFC5C05A",
+            "Arn"
+          ]
+        },
+        "CdnIdentifierSecret": {
+          "Ref": "CdnSecret32008E6A"
+        }
+      },
+      "DependsOn": [
+        "MediaPackagePolicyCBD9468D"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaPackageDashEndpoint/Default"
+      }
+    },
+    "MediaPackageCmafEndpoint": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "MediaPackageEndPoint",
+        "EndPoint": "CMAF",
+        "ChannelId": {
+          "Fn::GetAtt": [
+            "MediaPackageChannel",
+            "ChannelId"
+          ]
+        },
+        "SecretsRoleArn": {
+          "Fn::GetAtt": [
+            "MediaPackageRoleEFC5C05A",
+            "Arn"
+          ]
+        },
+        "CdnIdentifierSecret": {
+          "Ref": "CdnSecret32008E6A"
+        }
+      },
+      "DependsOn": [
+        "MediaPackagePolicyCBD9468D"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/MediaPackageCmafEndpoint/Default"
+      }
+    },
+    "LogsBucket9C4D8843": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "ObjectWriter"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W35",
+              "reason": "Used to store access logs for other buckets"
+            },
+            {
+              "id": "W51",
+              "reason": "Bucket is private and does not need a bucket policy"
+            }
+          ]
+        },
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Used to store access logs for other buckets",
+              "id": "AwsSolutions-S1"
+            },
+            {
+              "reason": "Bucket is private and is not using HTTP",
+              "id": "AwsSolutions-S10"
+            }
+          ]
+        }
+      }
+    },
+    "LogsBucketPolicyD70D9252": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "LogsBucket9C4D8843"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LogsBucket9C4D8843",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "LogsBucket9C4D8843",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/LogsBucket/Policy/Resource"
+      }
+    },
+    "CachePolicy26D8A535": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Properties": {
+        "CachePolicyConfig": {
+          "DefaultTTL": 86400,
+          "MaxTTL": 31536000,
+          "MinTTL": 0,
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "CachePolicy-",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                "-",
+                {
+                  "Ref": "AWS::Region"
+                }
+              ]
+            ]
+          },
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "CookiesConfig": {
+              "CookieBehavior": "all"
+            },
+            "EnableAcceptEncodingBrotli": false,
+            "EnableAcceptEncodingGzip": false,
+            "HeadersConfig": {
+              "HeaderBehavior": "whitelist",
+              "Headers": [
+                "Access-Control-Allow-Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Header",
+                "Origin"
+              ]
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "all"
+            }
+          }
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CachePolicy/Resource"
+      }
+    },
+    "CloudFrontD198EC06": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "CustomErrorResponses": [
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 400
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 403
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 404
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 405
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 414
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 416
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 500
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 501
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 502
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 503
+            },
+            {
+              "ErrorCachingMinTTL": 1,
+              "ErrorCode": 504
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS"
+            ],
+            "CachePolicyId": {
+              "Ref": "CachePolicy26D8A535"
+            },
+            "CachedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS"
+            ],
+            "Compress": true,
+            "TargetOriginId": "LiveStreamingCloudFrontOrigin15ADC200A",
+            "ViewerProtocolPolicy": "allow-all"
+          },
+          "Enabled": true,
+          "HttpVersion": "http2",
+          "IPV6Enabled": true,
+          "Logging": {
+            "Bucket": {
+              "Fn::GetAtt": [
+                "LogsBucket9C4D8843",
+                "RegionalDomainName"
+              ]
+            },
+            "Prefix": "cloudfront-logs/"
+          },
+          "Origins": [
+            {
+              "CustomOriginConfig": {
+                "OriginProtocolPolicy": "https-only",
+                "OriginSSLProtocols": [
+                  "TLSv1.2"
+                ]
+              },
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "MediaPackageHlsEndpoint",
+                  "DomainName"
+                ]
+              },
+              "Id": "LiveStreamingCloudFrontOrigin15ADC200A",
+              "OriginCustomHeaders": [
+                {
+                  "HeaderName": "X-MediaPackage-CDNIdentifier",
+                  "HeaderValue": {
+                    "Fn::GetAtt": [
+                      "UUID",
+                      "UUID"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "mediapackage:cloudfront_assoc",
+            "Value": {
+              "Fn::GetAtt": [
+                "MediaPackageChannel",
+                "Arn"
+              ]
+            }
+          },
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W70",
+              "reason": "CloudFront automatically sets the security policy to TLSv1 when the distribution uses the CloudFront domain name (CloudFrontDefaultCertificate=true)"
+            }
+          ]
+        },
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Use case does not warrant CloudFront Geo restriction",
+              "id": "AwsSolutions-CFR1"
+            },
+            {
+              "reason": "Use case does not warrant CloudFront integration with AWS WAF",
+              "id": "AwsSolutions-CFR2"
+            },
+            {
+              "reason": "CloudFront automatically sets the security policy to TLSv1 when the distribution uses the CloudFront domain name",
+              "id": "AwsSolutions-CFR4"
+            },
+            {
+              "reason": "CloudFront automatically sets the security policy to TLSv1 when the distribution uses the CloudFront domain name",
+              "id": "AwsSolutions-CFR5"
+            }
+          ]
+        }
+      }
+    },
+    "CloudFrontToS3S3LoggingBucketEF5CD8B2": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/S3LoggingBucket/Resource",
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W35",
+              "reason": "This S3 bucket is used as the access logging bucket for another bucket"
+            }
+          ]
+        },
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Used to store access logs for other buckets",
+              "id": "AwsSolutions-S1"
+            }
+          ]
+        }
+      }
+    },
+    "CloudFrontToS3S3LoggingBucketPolicy360F3875": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "CloudFrontToS3S3LoggingBucketEF5CD8B2"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CloudFrontToS3S3LoggingBucketEF5CD8B2",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CloudFrontToS3S3LoggingBucketEF5CD8B2",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "s3:PutObject",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "CloudFrontToS3S3Bucket9CE6AB04",
+                      "Arn"
+                    ]
+                  }
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "logging.s3.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "CloudFrontToS3S3LoggingBucketEF5CD8B2",
+                        "Arn"
+                      ]
+                    },
+                    "/*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/S3LoggingBucket/Policy/Resource"
+      }
+    },
+    "CloudFrontToS3S3Bucket9CE6AB04": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "LoggingConfiguration": {
+          "DestinationBucketName": {
+            "Ref": "CloudFrontToS3S3LoggingBucketEF5CD8B2"
+          }
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/S3Bucket/Resource"
+      }
+    },
+    "CloudFrontToS3S3BucketPolicy2495300D": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "CloudFrontToS3S3Bucket9CE6AB04"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CloudFrontToS3S3Bucket9CE6AB04",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CloudFrontToS3S3Bucket9CE6AB04",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "s3:GetObject",
+              "Effect": "Allow",
+              "Principal": {
+                "CanonicalUser": {
+                  "Fn::GetAtt": [
+                    "CloudFrontToS3CloudFrontDistributionOrigin1S3OriginB0637B8F",
+                    "S3CanonicalUserId"
+                  ]
+                }
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "CloudFrontToS3S3Bucket9CE6AB04",
+                        "Arn"
+                      ]
+                    },
+                    "/*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/S3Bucket/Policy/Resource",
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "F16",
+              "reason": "Public website bucket policy requires a wildcard principal"
+            }
+          ]
+        }
+      }
+    },
+    "CloudFrontToS3CloudfrontLoggingBucket8350BE9B": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "LogDeliveryWrite",
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "ObjectWriter"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/CloudfrontLoggingBucket/Resource",
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W35",
+              "reason": "This S3 bucket is used as the access logging bucket for CloudFront Distribution"
+            }
+          ]
+        },
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Used to store access logs for other buckets",
+              "id": "AwsSolutions-S1"
+            }
+          ]
+        }
+      }
+    },
+    "CloudFrontToS3CloudfrontLoggingBucketPolicy416B82D9": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "CloudFrontToS3CloudfrontLoggingBucket8350BE9B"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CloudFrontToS3CloudfrontLoggingBucket8350BE9B",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CloudFrontToS3CloudfrontLoggingBucket8350BE9B",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/CloudfrontLoggingBucket/Policy/Resource"
+      }
+    },
+    "CloudFrontToS3CloudFrontDistributionOrigin1S3OriginB0637B8F": {
+      "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity",
+      "Properties": {
+        "CloudFrontOriginAccessIdentityConfig": {
+          "Comment": "Identity for LiveStreamingCloudFrontToS3CloudFrontDistributionOrigin1940508AB"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/CloudFrontDistribution/Origin1/S3Origin/Resource"
+      }
+    },
+    "CloudFrontToS3CloudFrontDistribution241D9866": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "CustomErrorResponses": [
+            {
+              "ErrorCode": 404,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html"
+            },
+            {
+              "ErrorCode": 403,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html"
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS",
+              "PUT",
+              "PATCH",
+              "POST",
+              "DELETE"
+            ],
+            "CachePolicyId": {
+              "Ref": "CachePolicy26D8A535"
+            },
+            "CachedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS"
+            ],
+            "Compress": true,
+            "TargetOriginId": "LiveStreamingCloudFrontToS3CloudFrontDistributionOrigin1940508AB",
+            "ViewerProtocolPolicy": "redirect-to-https"
+          },
+          "DefaultRootObject": "index.html",
+          "Enabled": true,
+          "HttpVersion": "http2",
+          "IPV6Enabled": true,
+          "Logging": {
+            "Bucket": {
+              "Fn::GetAtt": [
+                "CloudFrontToS3CloudfrontLoggingBucket8350BE9B",
+                "RegionalDomainName"
+              ]
+            }
+          },
+          "Origins": [
+            {
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "CloudFrontToS3S3Bucket9CE6AB04",
+                  "RegionalDomainName"
+                ]
+              },
+              "Id": "LiveStreamingCloudFrontToS3CloudFrontDistributionOrigin1940508AB",
+              "S3OriginConfig": {
+                "OriginAccessIdentity": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "origin-access-identity/cloudfront/",
+                      {
+                        "Ref": "CloudFrontToS3CloudFrontDistributionOrigin1S3OriginB0637B8F"
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "SolutionId",
+            "Value": "SO0013"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CloudFrontToS3/CloudFrontDistribution/Resource",
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W70",
+              "reason": "Since the distribution uses the CloudFront domain name, CloudFront automatically sets the security policy to TLSv1 regardless of the value of MinimumProtocolVersion"
+            }
+          ]
+        },
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Use case does not warrant CloudFront Geo restriction",
+              "id": "AwsSolutions-CFR1"
+            },
+            {
+              "reason": "Use case does not warrant CloudFront integration with AWS WAF",
+              "id": "AwsSolutions-CFR2"
+            },
+            {
+              "reason": "CloudFront automatically sets the security policy to TLSv1 when the distribution uses the CloudFront domain name",
+              "id": "AwsSolutions-CFR4"
+            }
+          ]
+        }
+      }
+    },
+    "DemoIAMPolicy2174894A": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:putObject",
+                "s3:getObject",
+                "s3:deleteObject",
+                "s3:listBucket"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CloudFrontToS3S3Bucket9CE6AB04",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "CloudFrontToS3S3Bucket9CE6AB04"
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "s3:getObject",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::solutions-",
+                      {
+                        "Ref": "AWS::Region"
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::solutions-",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "DemoIAMPolicy2174894A",
+        "Roles": [
+          {
+            "Ref": "CustomResourceRoleAB1EF463"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/DemoIAMPolicy/Resource",
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "reason": "Lambda role needs access to all contents within the buckets to load files for hosting the web player",
+              "id": "AwsSolutions-IAM5"
+            }
+          ]
+        }
+      }
+    },
+    "DemoConsole": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "DemoConsole",
+        "srcBucket": {
+          "Fn::Join": [
+            "",
+            [
+              "solutions-",
+              {
+                "Ref": "AWS::Region"
+              }
+            ]
+          ]
+        },
+        "srcPath": "live-streaming-on-aws/v4.2.1",
+        "manifestFile": "console-manifest.json",
+        "destBucket": {
+          "Ref": "CloudFrontToS3S3Bucket9CE6AB04"
+        },
+        "awsExports": {
+          "Fn::Join": [
+            "",
+            [
+              "//Configuration file generated by cloudformation\n        const awsExports = {\n          mediaLiveConsole: 'https://console.aws.amazon.com/medialive/home?region=",
+              {
+                "Ref": "AWS::Region"
+              },
+              "#/channels/",
+              {
+                "Fn::GetAtt": [
+                  "MediaLiveChannel",
+                  "ChannelId"
+                ]
+              },
+              "',\n          hls_manifest: 'https://",
+              {
+                "Fn::GetAtt": [
+                  "CloudFrontD198EC06",
+                  "DomainName"
+                ]
+              },
+              "/out/v1",
+              {
+                "Fn::GetAtt": [
+                  "MediaPackageHlsEndpoint",
+                  "Manifest"
+                ]
+              },
+              "',\n          dash_manifest: 'https://",
+              {
+                "Fn::GetAtt": [
+                  "CloudFrontD198EC06",
+                  "DomainName"
+                ]
+              },
+              "/out/v1",
+              {
+                "Fn::GetAtt": [
+                  "MediaPackageDashEndpoint",
+                  "Manifest"
+                ]
+              },
+              "',\n          cmaf_manifest: 'https://",
+              {
+                "Fn::GetAtt": [
+                  "CloudFrontD198EC06",
+                  "DomainName"
+                ]
+              },
+              "/out/v1",
+              {
+                "Fn::GetAtt": [
+                  "MediaPackageCmafEndpoint",
+                  "Manifest"
+                ]
+              },
+              "'\n        }"
+            ]
+          ]
+        }
+      },
+      "DependsOn": [
+        "CloudFrontToS3CloudFrontDistributionOrigin1S3OriginB0637B8F",
+        "CloudFrontToS3CloudFrontDistribution241D9866",
+        "CloudFrontToS3CloudfrontLoggingBucketPolicy416B82D9",
+        "CloudFrontToS3CloudfrontLoggingBucket8350BE9B",
+        "CloudFrontToS3S3BucketPolicy2495300D",
+        "CloudFrontToS3S3Bucket9CE6AB04",
+        "CloudFrontToS3S3LoggingBucketPolicy360F3875",
+        "CloudFrontToS3S3LoggingBucketEF5CD8B2",
+        "DemoIAMPolicy2174894A"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/DemoConsole/Default"
+      }
+    },
+    "AppRegistryAttributeIdDF43F316": {
+      "Type": "AWS::ServiceCatalogAppRegistry::AttributeGroup",
+      "Properties": {
+        "Attributes": {
+          "ApplicationType": "AWS-Solutions",
+          "SolutionVersion": "v4.2.1",
+          "SolutionID": "SO0013",
+          "SolutionName": "Live Streaming on AWS"
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "A30-",
+              {
+                "Ref": "AWS::Region"
+              },
+              "-",
+              {
+                "Ref": "AWS::StackName"
+              }
+            ]
+          ]
+        },
+        "Description": "Attribute group for solution information.",
+        "Tags": {
+          "SolutionId": "SO0013"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/AppRegistryAttributeId/Resource"
+      }
+    },
+    "AppRegistryApp5349BE86": {
+      "Type": "AWS::ServiceCatalogAppRegistry::Application",
+      "Properties": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              "live-streaming-on-aws-",
+              {
+                "Ref": "AWS::StackName"
+              }
+            ]
+          ]
+        },
+        "Description": "Service Catalog application to track and manage all your resources. The SolutionId is SO0013 and SolutionVersion is v4.2.1.",
+        "Tags": {
+          "ApplicationType": "AWS-Solutions",
+          "appRegistryApplicationName": "live-streaming-on-aws-stack",
+          "SolutionDomain": "CloudFoundations",
+          "solutionId": "SO0013",
+          "SolutionId": "SO0013",
+          "SolutionName": "Live Streaming on AWS",
+          "SolutionVersion": "v4.2.1"
+        }
+      },
+      "DependsOn": [
+        "AppRegistryAttributeIdDF43F316"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/AppRegistryApp/Resource"
+      }
+    },
+    "AppRegistryAppResourceAssociationbb30b2b6ffac2CF098B8": {
+      "Type": "AWS::ServiceCatalogAppRegistry::ResourceAssociation",
+      "Properties": {
+        "Application": {
+          "Fn::GetAtt": [
+            "AppRegistryApp5349BE86",
+            "Id"
+          ]
+        },
+        "Resource": {
+          "Ref": "AWS::StackId"
+        },
+        "ResourceType": "CFN_STACK"
+      },
+      "DependsOn": [
+        "AppRegistryAttributeIdDF43F316"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/AppRegistryApp/ResourceAssociationbb30b2b6ffac"
+      }
+    },
+    "AppRegistryAppAttributeGroupAssociatione6a1c2e3176a77F7002D": {
+      "Type": "AWS::ServiceCatalogAppRegistry::AttributeGroupAssociation",
+      "Properties": {
+        "Application": {
+          "Fn::GetAtt": [
+            "AppRegistryApp5349BE86",
+            "Id"
+          ]
+        },
+        "AttributeGroup": {
+          "Fn::GetAtt": [
+            "AppRegistryAttributeIdDF43F316",
+            "Id"
+          ]
+        }
+      },
+      "DependsOn": [
+        "AppRegistryAttributeIdDF43F316"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/AppRegistryApp/AttributeGroupAssociatione6a1c2e3176a"
+      }
+    },
+    "AnonymousMetric": {
+      "Type": "AWS::CloudFormation::CustomResource",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResource8CDCD7A7",
+            "Arn"
+          ]
+        },
+        "Resource": "AnonymousMetric",
+        "SolutionId": "SO0013",
+        "UUID": {
+          "Fn::GetAtt": [
+            "UUID",
+            "UUID"
+          ]
+        },
+        "Version": "v4.2.1",
+        "InputType": {
+          "Ref": "InputType"
+        },
+        "EncodingProfile": {
+          "Ref": "EncodingProfile"
+        },
+        "Cidr": {
+          "Ref": "InputCIDR"
+        },
+        "ChannelStart": {
+          "Ref": "ChannelStart"
+        },
+        "SendAnonymousMetric": {
+          "Fn::FindInMap": [
+            "AnonymizedData",
+            "SendAnonymizedData",
+            "Data"
+          ]
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/AnonymousMetric/Default"
+      }
+    },
+    "CDKMetadata": {
+      "Type": "AWS::CDK::Metadata",
+      "Properties": {
+        "Analytics": "v2:deflate64:H4sIAAAAAAAA/3VSTW/CMAz9LbungY193laYmHaYQLA7MqkpgTap8sGEqv73OSmFMm2X2C+2X5xn3/H66Z4Pb+DbJiLbJ4Vc83rpQOzZZKPmYKBEhyaAT6gqqXJGqataQsnrhS4wRKKd60KKY6yKXsMKKNcZ8HrqlXBSqxDr/IbZ0QqsRWd5GgxhXo+92KMbg0XWuqHk5LXm8kofExsKQ1wlKMjR0BciDnmt1zBRaJ9tjFaO1xMQW7xQ9eGbtM7Ite8avsIzI3OpUiHQ2o8MlZOuJQjc08D9V0bozhykQAEOCp2TjgbzwHukVjYqde0L+G60rwJfWlXUDHQ9LNBqbwSSUFrI8/V1XS/YNKwrYVFcGmgeRjfx1unyHOtRB3/mXeWjZhOtMtmOafRM2/Ea1sPqIqpAi0KHM144O4h7c1Y2oSFetPjSyxEbPfBhAkW1hY6H1iyW/SvKKb3+pUtPFPqg0hnynR0cbh/57Qtx76yUifGkeIl80dofczBnw94CAAA="
+      },
+      "Metadata": {
+        "aws:cdk:path": "LiveStreaming/CDKMetadata/Default"
+      },
+      "Condition": "CDKMetadataAvailable"
+    }
+  },
+  "Outputs": {
+    "AnonymousMetricUUID": {
+      "Description": "AnonymousMetric UUID",
+      "Value": {
+        "Fn::GetAtt": [
+          "UUID",
+          "UUID"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-AnonymousMetricUUID"
+            ]
+          ]
+        }
+      }
+    },
+    "MediaLiveChannelConsole": {
+      "Description": "MediaLive Channel",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".console.aws.amazon.com/medialive/home?region=",
+            {
+              "Ref": "AWS::Region"
+            },
+            "#!/channels/",
+            {
+              "Fn::GetAtt": [
+                "MediaLiveChannel",
+                "ChannelId"
+              ]
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-MediaLiveChannel"
+            ]
+          ]
+        }
+      }
+    },
+    "MediaLiveMetrics": {
+      "Description": "MediaLive Metrics",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".console.aws.amazon.com/medialive/home?region=",
+            {
+              "Ref": "AWS::Region"
+            },
+            "#!/channels/",
+            {
+              "Fn::GetAtt": [
+                "MediaLiveChannel",
+                "ChannelId"
+              ]
+            },
+            "/health"
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-MediaLiveMetrics"
+            ]
+          ]
+        }
+      }
+    },
+    "MediaLivePrimaryEndpoint": {
+      "Description": "Primary MediaLive input URL",
+      "Value": {
+        "Fn::GetAtt": [
+          "MediaLiveInput",
+          "EndPoint1"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-MediaLivePrimaryEndpoint"
+            ]
+          ]
+        }
+      }
+    },
+    "MediaLiveSecondaryEndpoint": {
+      "Description": "Secondary MediaLive input URL",
+      "Value": {
+        "Fn::GetAtt": [
+          "MediaLiveInput",
+          "EndPoint2"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-MediaLiveSecondaryEndpoint"
+            ]
+          ]
+        }
+      }
+    },
+    "MediaPackageMetrics": {
+      "Description": "MediaPackage Metrics",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".console.aws.amazon.com/mediapackage/home?region=",
+            {
+              "Ref": "AWS::Region"
+            },
+            "#/channels/",
+            {
+              "Fn::GetAtt": [
+                "MediaPackageChannel",
+                "ChannelId"
+              ]
+            },
+            "?tabId=metrics"
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-MediaPackageMetrics"
+            ]
+          ]
+        }
+      }
+    },
+    "CloudFrontHlsEndpoint": {
+      "Description": "HLS CloudFront URL",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Fn::GetAtt": [
+                "CloudFrontD198EC06",
+                "DomainName"
+              ]
+            },
+            "/out/v1",
+            {
+              "Fn::GetAtt": [
+                "MediaPackageHlsEndpoint",
+                "Manifest"
+              ]
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-CloudFrontHlsEndpoint"
+            ]
+          ]
+        }
+      }
+    },
+    "CloudFrontDashEndpoint": {
+      "Description": "DASH CloudFront URL",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Fn::GetAtt": [
+                "CloudFrontD198EC06",
+                "DomainName"
+              ]
+            },
+            "/out/v1",
+            {
+              "Fn::GetAtt": [
+                "MediaPackageDashEndpoint",
+                "Manifest"
+              ]
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-CloudFrontDashEndpoint"
+            ]
+          ]
+        }
+      }
+    },
+    "CloudFrontCmafEndpoint": {
+      "Description": "CMAF CloudFront URL",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Fn::GetAtt": [
+                "CloudFrontD198EC06",
+                "DomainName"
+              ]
+            },
+            "/out/v1",
+            {
+              "Fn::GetAtt": [
+                "MediaPackageCmafEndpoint",
+                "Manifest"
+              ]
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-CloudFrontCmafEndpoint"
+            ]
+          ]
+        }
+      }
+    },
+    "DemoPlayer": {
+      "Description": "Demo Player URL",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Fn::GetAtt": [
+                "CloudFrontToS3CloudFrontDistribution241D9866",
+                "DomainName"
+              ]
+            },
+            "/index.html"
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-DemoPlayer"
+            ]
+          ]
+        }
+      }
+    },
+    "DemoBucketConsole": {
+      "Description": "Demo bucket",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".console.aws.amazon.com/s3/buckets/",
+            {
+              "Ref": "CloudFrontToS3S3Bucket9CE6AB04"
+            },
+            "?region=",
+            {
+              "Ref": "AWS::Region"
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-DemoBucket"
+            ]
+          ]
+        }
+      }
+    },
+    "LogsBucketConsole": {
+      "Description": "Logs bucket",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".console.aws.amazon.com/s3/buckets/",
+            {
+              "Ref": "LogsBucket9C4D8843"
+            },
+            "?region=",
+            {
+              "Ref": "AWS::Region"
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-LogsBucket"
+            ]
+          ]
+        }
+      }
+    },
+    "AppRegistryConsole": {
+      "Description": "AppRegistry",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".console.aws.amazon.com/servicecatalog/home?#applications/",
+            {
+              "Fn::GetAtt": [
+                "AppRegistryApp5349BE86",
+                "Id"
+              ]
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-AppRegistry"
+            ]
+          ]
+        }
+      }
+    },
+    "MediaLiveChannelId": {
+      "Description": "MediaLive Channel Id",
+      "Value": {
+        "Fn::GetAtt": [
+          "MediaLiveChannel",
+          "ChannelId"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::StackName"
+              },
+              "-MediaLiveChannelId"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "Conditions": {
+    "CDKMetadataAvailable": {
+      "Fn::Or": [
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "af-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ca-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-northwest-1"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-3"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "me-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "sa-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-2"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-west-2"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

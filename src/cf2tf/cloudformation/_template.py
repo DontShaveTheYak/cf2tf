@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-import yaml
+import yaml  # type: ignore
 from cfn_tools import dump_yaml, load_yaml  # type: ignore
 
 log = logging.getLogger("cf2tf")

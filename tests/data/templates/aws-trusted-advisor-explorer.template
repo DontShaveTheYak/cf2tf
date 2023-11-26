@@ -1,0 +1,4127 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "(SO0082) - AWS Trusted Advisor Explorer Solution template",
+    "Parameters": {
+        "CrossAccountRoleName": {
+            "Description": "(Required) The CrossAccount Role Name that exists in all of the Member Accounts (ex: OrganizationAccountAccessRole)",
+            "Type": "String"
+        },
+        "Language": {
+            "AllowedValues": [
+                "en"
+            ],
+            "Description": "AWS Trusted Advisor Explorer currently supports English ('en') only.",
+            "Type": "String",
+            "Default": "en"
+        },
+        "ReportSchedule": {
+            "Description": "(Required) Schedule for gathering trusted advisor recommendations and/or tag data, ex: cron(0 9 1 * ? *) see Link:https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html#CronExpressions",
+            "Type": "String",
+            "Default": "cron(0 9 1 * ? *)"
+        },
+        "GlueCrawlerSchedule": {
+            "Description": "(Required) Schedule for updating the trusted advisor recommendations data lake with new data; Please set this to 2 hours post the ReportSchedule, ex: cron(0 11 1 * ? *) see Link:https://docs.aws.amazon.com/glue/latest/dg/monitor-data-warehouse-schedule.html",
+            "Type": "String",
+            "Default": "cron(0 11 1 * ? *)"
+        },
+        "InterestedTagKeys": {
+            "Description": "(Optional) Tags that you would like to extract Ex: env,costcenter,asset_id,etc ..",
+            "Type": "String"
+        },
+        "SNSEmail": {
+            "Description": "(Required) The email address to alert when Trusted Advisor Data is refreshed.",
+            "Type": "String"
+        },
+        "LogLevel": {
+            "AllowedValues": [
+                "ERROR",
+                "INFO"
+            ],
+            "Description": "Log Level on Lambda Functions. Use INFO for Troubleshooting purposes only.",
+            "Type": "String",
+            "Default": "ERROR"
+        },
+        "MaskAccountInformation": {
+            "AllowedValues": [
+                "true",
+                "false"
+            ],
+            "Description": "Setting this to true will mask Account Id, Account Name & Email saved to Logs",
+            "Type": "String",
+            "Default": "true"
+        }
+    },
+    "Mappings": {
+        "SourceCode": {
+            "General": {
+                "S3Bucket": "%%BUCKET_NAME%%",
+                "KeyPrefix": "%%SOLUTION_NAME%%/%%VERSION%%",
+                "Version": "%%VERSION%%"
+            }
+        },
+        "Send": {
+            "AnonymousUsage": {
+                "Data": "yes"
+            }
+        }
+    },
+    "Resources": {
+        "SolutionHelper": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "Properties": {
+                "Handler": "solution-helper.lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "SolutionHelperLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Description": "This function creates a CloudFormation custom lambda resource that creates custom lambda functions by finding and replacing specific values from existing lambda function code.",
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "solution-helper.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Runtime": "python3.8",
+                "Timeout": 300
+            }
+        },
+        "SolutionHelperLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "SolutionHelperLambdaExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": [
+                "SolutionHelper"
+            ],
+            "Properties": {
+                "PolicyName": "AWSTrustedAdEx-SolutionHelperLambdaExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "SolutionHelperLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs: CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs: CreateLogStream",
+                                "logs: PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "SolutionHelper"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "SolutionHelper"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "UUIDGenerator": {
+            "Type": "Custom::UUIDGenerator",
+            "Properties": {
+                "ServiceToken": {
+                    "Fn::GetAtt": [
+                        "SolutionHelper",
+                        "Arn"
+                    ]
+                },
+                "Region": {
+                    "Ref": "AWS::Region"
+                }
+            }
+        },
+        "AWSTrustedAdvisorExplorerBucketAccessLogging": {
+            "Type": "AWS::S3::Bucket",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W51",
+                            "reason": "This bucket already has PublicAccessBlockConfiguration applied."
+                        },
+                        {
+                            "id": "W35",
+                            "reason": "This bucket itself is primarily for access logging"
+                        }
+                    ]
+                }
+            },
+            "DeletionPolicy": "Retain",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "ProjectName",
+                        "Value": "AWS Trusted Advisor Explorer"
+                    }
+                ],
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {
+                            "ServerSideEncryptionByDefault": {
+                                "SSEAlgorithm": "AES256"
+                            }
+                        }
+                    ]
+                },
+                "AccessControl": "LogDeliveryWrite",
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                }
+            }
+        },
+        "S3Bucket": {
+            "Type": "AWS::S3::Bucket",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W51",
+                            "reason": "This bucket already has PublicAccessBlockConfiguration applied."
+                        }
+                    ]
+                }
+            },
+            "DeletionPolicy": "Retain",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "ProjectName",
+                        "Value": "AWS Trusted Advisor Explorer"
+                    }
+                ],
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {
+                            "ServerSideEncryptionByDefault": {
+                                "SSEAlgorithm": "AES256"
+                            }
+                        }
+                    ]
+                },
+                "LoggingConfiguration": {
+                    "DestinationBucketName": {
+                        "Ref": "AWSTrustedAdvisorExplorerBucketAccessLogging"
+                    }
+                },
+                "AccessControl": "Private",
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                }
+            }
+        },
+        "ExtractTAData": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "ExtractTADataLambdaExecutionRole"
+            ],
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "extract-ta-data-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "ExtractTADataLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "S3BucketName": {
+                            "Ref": "S3Bucket"
+                        },
+                        "IAMRoleName": {
+                            "Ref": "CrossAccountRoleName"
+                        },
+                        "Header_1e93e4c0b5": "Status,Zone,Instance Type,Platform,Instance Count,Current Monthly Cost,Estimated Monthly Savings,Expiration Date,Reserved Instance Id,Reason",
+                        "Header_51fC20e7I2": "Status,Hosted Zone Name,Hosted Zone Id,Resource Record Set Name,Resource Record Set Type",
+                        "Header_DAvU99Dc4C": "Status,Region,Volume Id,Volume Name,Volume Type,Volume Size,Monthly Storage Cost,Snapshot Id,Snapshot Name,Snapshot Age",
+                        "Header_G31sQ1E9U": "Status,Region,Cluster,Instance Type,Reason,Estimated Monthly Savings",
+                        "Header_Qch7DwouX1": "Status,Region,AZ,Instance Id,Instance Name,Instance Type,Estimated Monthly Savings,Day1,Day2,Day3,Day4,Day5,Day6,Day7,Day8,Day9,Day10,Day11,Day12,Day13,Day14 Latest Day,14-Day Average CPU Utilization,14-Day Average Network I/O,Number of Days Low Utilization",
+                        "Header_Ti39halfu8": "Status,Region,DB Instance Name,Multi-AZ,Instance Type,Storage Provisioned GB,Days Since Last Connection,Estimated Monthly Savings On Demand",
+                        "Header_Z4AUBRNSmz": "Status,Region,IP Address",
+                        "Header_cX3c2R1chu": "Status,Region,Instance Type,Platform,Recommended Number of RIs to Purchase,Expected Average RI Utilization,Estimated Savings with Recommendation Monthly,Upfront Cost of RIs,Estimated cost of RIs Monthly,Estimated On-Demand Cost Post Recommended RI Purchase Monthly,Estimated Break Even Months,Lookback Period Days,Term Years",
+                        "Header_hjLMh88uM8": "Status,Region,Load Balancer Name,Reason,Estimated Monthly Savings",
+                        "Schema_1e93e4c0b5": "0,1,2,3,4,5,6,7,8,9",
+                        "Schema_51fC20e7I2": "status,0,1,2,3",
+                        "Schema_DAvU99Dc4C": "status,0,1,2,3,4,5,6,7,8",
+                        "Schema_G31sQ1E9U": "0,1,2,3,4,5",
+                        "Schema_Qch7DwouX1": "status,region,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
+                        "Schema_Ti39halfu8": "status,0,1,2,3,4,5,6",
+                        "Schema_Z4AUBRNSmz": "status,0,1",
+                        "Schema_cX3c2R1chu": "status,0,1,2,3,4,5,6,7,8,9,10,11",
+                        "Schema_hjLMh88uM8": "status,0,1,2,3",
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "Header_Summary": "CheckId,Status,ResourcesProcessed,ResourcesFlagged,ResourcesIgnored,ResourcesSuppressed,EstimatedMonthlySavings,EstimatedPercentMonthlySavings",
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        }
+                    }
+                },
+                "Timeout": 300,
+                "Handler": "extract-ta-data-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 256
+            }
+        },
+        "ExtractTADataLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "ExtractTADataLambdaExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": [
+                "ExtractTAData"
+            ],
+            "Properties": {
+                "PolicyName": "ExtractTADataLambdaExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "ExtractTADataLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "ExtractTAData"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "ExtractTAData"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:PutObjectAcl"
+                            ],
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref": "S3Bucket"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "sts:AssumeRole",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:iam::*:role/",
+                                        {
+                                            "Ref": "CrossAccountRoleName"
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "VerifyTACheckStatusLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "VerifyTACheckStatusLambdaExecutionRole"
+            ],
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "verify-ta-check-status-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "VerifyTACheckStatusLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "IAMRoleName": {
+                            "Ref": "CrossAccountRoleName"
+                        },
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        }
+                    }
+                },
+                "Timeout": 60,
+                "Handler": "verify-ta-check-status-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 128
+            }
+        },
+        "VerifyTACheckStatusLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "VerifyTACheckStatusLambdaExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": [
+                "VerifyTACheckStatusLambda"
+            ],
+            "Properties": {
+                "PolicyName": "VerifyTACheckStatusLambdaExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "VerifyTACheckStatusLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "VerifyTACheckStatusLambda"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "VerifyTACheckStatusLambda"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "sts:AssumeRole",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:iam::*:role/",
+                                        {
+                                            "Ref": "CrossAccountRoleName"
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "RefreshTACheckLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "refresh-ta-check-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "RefTACheckLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "IAMRoleName": {
+                            "Ref": "CrossAccountRoleName"
+                        },
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "S3BucketName": {
+                            "Ref": "S3Bucket"
+                        },
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        }
+                    }
+                },
+                "Timeout": 60,
+                "Handler": "refresh-ta-check-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 128
+            }
+        },
+        "RefTACheckLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "RefTACheckLambdaExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": [
+                "RefreshTACheckLambda"
+            ],
+            "Properties": {
+                "PolicyName": "RefTACheckLambdaExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "RefTACheckLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "RefreshTACheckLambda"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "RefreshTACheckLambda"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "sts:AssumeRole",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:iam::*:role/",
+                                        {
+                                            "Ref": "CrossAccountRoleName"
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:PutObjectAcl"
+                            ],
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref": "S3Bucket"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "MapTACheckStepFunction": {
+            "Type": "AWS::StepFunctions::StateMachine",
+            "DependsOn": [
+                "RefreshTACheckLambda",
+                "VerifyTACheckStatusLambda",
+                "ExtractTAData"
+            ],
+            "Properties": {
+                "StateMachineName": "MapTACheck",
+                "DefinitionString": {
+                    "Fn::Join": [
+                        "\n",
+                        [
+                            "{",
+                            "    \"StartAt\": \"MapTACheck\",",
+                            "    \"States\": {",
+                            "        \"MapTACheck\": {",
+                            "            \"Type\": \"Map\",",
+                            "            \"Iterator\": {",
+                            "                \"StartAt\": \"TARefresh\",",
+                            "                \"States\": {",
+                            "                    \"TARefresh\": {",
+                            "                        \"Type\": \"Task\",",
+                            {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "             \"Resource\": \"",
+                                        {
+                                            "Fn::GetAtt": [
+                                                "RefreshTACheckLambda",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "\","
+                                    ]
+                                ]
+                            },
+                            "                        \"Next\": \"VerifyTACheckStatus\",",
+                            "                        \"Retry\": [",
+                            "                          {",
+                            "                           \"ErrorEquals\": [ \"Lambda.TooManyRequestsException\"],",
+                            "                           \"IntervalSeconds\": 2,",
+                            "                           \"MaxAttempts\": 6,",
+                            "                           \"BackoffRate\": 2",
+                            "                           },",
+                            "                          {",
+                            "                            \"ErrorEquals\": [\"States.ALL\"],",
+                            "                            \"IntervalSeconds\": 5,",
+                            "                            \"MaxAttempts\": 2,",
+                            "                            \"BackoffRate\": 2",
+                            "                          }",
+                            "                        ]",
+                            "                    },",
+                            "                    \"wait_X_seconds\": {",
+                            "                        \"Type\": \"Wait\",",
+                            "                        \"SecondsPath\": \"$.WaitTimeInSec\",",
+                            "                        \"Next\": \"VerifyTACheckStatus\"",
+                            "                    },",
+                            "                    \"VerifyTACheckStatus\": {",
+                            "                        \"Type\": \"Task\",",
+                            {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "             \"Resource\": \"",
+                                        {
+                                            "Fn::GetAtt": [
+                                                "VerifyTACheckStatusLambda",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "\","
+                                    ]
+                                ]
+                            },
+                            "                        \"Next\": \"Refresh Complete?\",",
+                            "                        \"Retry\": [",
+                            "                            {",
+                            "                                \"ErrorEquals\": [",
+                            "                                    \"Lambda.TooManyRequestsException\"",
+                            "                                ],",
+                            "                                \"IntervalSeconds\": 2,",
+                            "                                \"MaxAttempts\": 6,",
+                            "                                \"BackoffRate\": 2",
+                            "                            },",
+                            "                          {",
+                            "                            \"ErrorEquals\": [\"States.ALL\"],",
+                            "                            \"IntervalSeconds\": 2,",
+                            "                            \"MaxAttempts\": 2,",
+                            "                            \"BackoffRate\": 2",
+                            "                          }",
+                            "                        ]",
+                            "                    },",
+                            "                    \"Refresh Complete?\": {",
+                            "                        \"Type\": \"Choice\",",
+                            "                        \"Choices\": [",
+                            "                            {",
+                            "                                \"Variable\": \"$.RefreshStatus\",",
+                            "                                \"StringEquals\": \"enqueued\",",
+                            "                                \"Next\": \"wait_X_seconds\"",
+                            "                            },",
+                            "                            {",
+                            "                                \"Variable\": \"$.RefreshStatus\",",
+                            "                                \"StringEquals\": \"processing\",",
+                            "                                \"Next\": \"wait_X_seconds\"",
+                            "                            }",
+                            "                        ],",
+                            "                        \"Default\": \"TACheck\"",
+                            "                    },",
+                            "                    \"TACheck\": {",
+                            "                        \"Type\": \"Task\",",
+                            {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "             \"Resource\": \"",
+                                        {
+                                            "Fn::GetAtt": [
+                                                "ExtractTAData",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "\","
+                                    ]
+                                ]
+                            },
+                            "                        \"End\": true,",
+                            "                        \"Retry\": [",
+                            "                            {",
+                            "                                \"ErrorEquals\": [",
+                            "                                    \"Lambda.TooManyRequestsException\"",
+                            "                                ],",
+                            "                                \"IntervalSeconds\": 2,",
+                            "                                \"MaxAttempts\": 6,",
+                            "                                \"BackoffRate\": 2",
+                            "                            },",
+                            "                            {",
+                            "                            \"ErrorEquals\": [\"States.ALL\"],",
+                            "                            \"IntervalSeconds\": 2,",
+                            "                            \"MaxAttempts\": 2,",
+                            "                            \"BackoffRate\": 2",
+                            "                            }",
+                            "                        ]",
+                            "                    }",
+                            "                }",
+                            "            },",
+                            "            \"End\": true",
+                            "        }",
+                            "    }",
+                            "}"
+                        ]
+                    ]
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "MapTACheckExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "ProjectName",
+                        "Value": "AWS Trusted Advisor Explorer"
+                    }
+                ]
+            }
+        },
+        "MapTACheckExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "states.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "MapTACheckExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "StepMapTACheckExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "MapTACheckExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "lambda:InvokeFunction"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "ExtractTAData",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::GetAtt": [
+                                        "VerifyTACheckStatusLambda",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::GetAtt": [
+                                        "RefreshTACheckLambda",
+                                        "Arn"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "GetTAChecks": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "MapTACheckStepFunction"
+            ],
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "get-ta-checks-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "GetTAChecksExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "LANGUAGE": {
+                            "Ref": "Language"
+                        },
+                        "EXTRACT_TA_DATA_PER_CHECK_SFN_ARN": {
+                            "Ref": "MapTACheckStepFunction"
+                        },
+                        "Category": "cost_optimizing",
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        },
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "SupportedChecks" : "Qch7DwouX1,hjLMh88uM8,DAvU99Dc4C,Z4AUBRNSmz,Ti39halfu8,51fC20e7I2,G31sQ1E9U,1e93e4c0b5"
+                    }
+                },
+                "Timeout": 5,
+                "Handler": "get-ta-checks-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 128
+            }
+        },
+        "GetTAChecksExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "GetTAChecksExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W12",
+                            "reason": "This lambda needs permissions to support:* as support API does not currently support specific actions."
+                        },
+                        {
+                            "id": "F4",
+                            "reason": "Support API only accepts * for resource."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "GetTAChecks"
+            ],
+            "Properties": {
+                "PolicyName": "GetTAChecksExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "GetTAChecksExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "states:StartExecution",
+                            "Resource": {
+                                "Ref": "MapTACheckStepFunction"
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "support:*"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "GetTAChecks"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "GetTAChecks"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "MapOrganizationsStepFunction": {
+            "Type": "AWS::StepFunctions::StateMachine",
+            "Properties": {
+                "StateMachineName": "MapOrganizations",
+                "DefinitionString": {
+                    "Fn::Join": [
+                        "\n",
+                        [
+                            "{",
+                            "  \"StartAt\": \"MapOrganizations\",",
+                            "  \"States\": {",
+                            "    \"MapOrganizations\": {",
+                            "      \"Type\": \"Map\",",
+                            "      \"Iterator\": {",
+                            "         \"StartAt\": \"GetTAChecks\",",
+                            "         \"States\": {",
+                            "           \"GetTAChecks\": {",
+                            "             \"Type\": \"Task\",",
+                            {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "             \"Resource\": \"",
+                                        {
+                                            "Fn::GetAtt": [
+                                                "GetTAChecks",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "\","
+                                    ]
+                                ]
+                            },
+                            "             \"End\": true,",
+                            "             \"Retry\": [",
+                            "              {",
+                            "                 \"ErrorEquals\": [ \"Lambda.TooManyRequestsException\"],",
+                            "                 \"IntervalSeconds\": 2,",
+                            "                 \"MaxAttempts\": 6,",
+                            "                 \"BackoffRate\": 2",
+                            "               },",
+                            "              {",
+                            "                \"ErrorEquals\": [\"States.ALL\"],",
+                            "                \"IntervalSeconds\": 5,",
+                            "                \"MaxAttempts\": 2,",
+                            "                \"BackoffRate\": 2",
+                            "              }",
+                            "            ]",
+                            "           }",
+                            "         }",
+                            "      },",
+                            "      \"End\": true",
+                            "    }",
+                            "}",
+                            "}"
+                        ]
+                    ]
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "MapOrganizationsExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "ProjectName",
+                        "Value": "AWS Trusted Advisor Explorer"
+                    }
+                ]
+            }
+        },
+        "MapOrganizationsExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "states.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "MapOrganizationsExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "StepMapOrganizationsExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "MapOrganizationsExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "lambda:InvokeFunction"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "GetTAChecks",
+                                        "Arn"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "TagExtractorLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "TagExtractorLambdaExecutionRole"
+            ],
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "extract-tag-data-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "TagExtractorLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "S3BucketName": {
+                            "Ref": "S3Bucket"
+                        },
+                        "IAMRoleName": {
+                            "Ref": "CrossAccountRoleName"
+                        },
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "CustomerKeys": {
+                            "Ref": "InterestedTagKeys"
+                        },
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        }
+                    }
+                },
+                "Timeout": 300,
+                "Handler": "extract-tag-data-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 256
+            }
+        },
+        "TagExtractorLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "TagExtractorLambdaExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": [
+                "TagExtractorLambda"
+            ],
+            "Properties": {
+                "PolicyName": "TagExtractorLambdaExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "TagExtractorLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "TagExtractorLambda"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "TagExtractorLambda"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:PutObjectAcl"
+                            ],
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref": "S3Bucket"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "sts:AssumeRole",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:iam::*:role/",
+                                        {
+                                            "Ref": "CrossAccountRoleName"
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "TagExtractorStepFunction": {
+            "Type": "AWS::StepFunctions::StateMachine",
+            "DependsOn": [
+                "TagExtractorLambda"
+            ],
+            "Properties": {
+                "StateMachineName": "ExtractTags",
+                "DefinitionString": {
+                    "Fn::Join": [
+                        "\n",
+                        [
+                            "{",
+                            "    \"StartAt\": \"MapTags\",",
+                            "    \"States\": {",
+                            "        \"MapTags\": {",
+                            "            \"Type\": \"Map\",",
+                            "            \"Iterator\": {",
+                            "                \"StartAt\": \"ExtractTags\",",
+                            "                \"States\": {",
+                            "                    \"ExtractTags\": {",
+                            "                        \"Type\": \"Task\",",
+                            {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "             \"Resource\": \"",
+                                        {
+                                            "Fn::GetAtt": [
+                                                "TagExtractorLambda",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "\","
+                                    ]
+                                ]
+                            },
+                            "                        \"End\": true,",
+                            "                        \"Retry\": [",
+                            "                            {",
+                            "                                \"ErrorEquals\": [",
+                            "                                    \"Lambda.TooManyRequestsException\"",
+                            "                                ],",
+                            "                                \"IntervalSeconds\": 2,",
+                            "                                \"MaxAttempts\": 6,",
+                            "                                \"BackoffRate\": 2",
+                            "                            },",
+                            "                          {",
+                            "                            \"ErrorEquals\": [\"States.ALL\"],",
+                            "                            \"IntervalSeconds\": 2,",
+                            "                            \"MaxAttempts\": 2,",
+                            "                            \"BackoffRate\": 2",
+                            "                          }",
+                            "                        ]",
+                            "                    }",
+                            "                }",
+                            "            },",
+                            "            \"End\": true",
+                            "        }",
+                            "    }",
+                            "}"
+                        ]
+                    ]
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "ExtractTagsStepExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "ProjectName",
+                        "Value": "AWS Trusted Advisor Explorer"
+                    }
+                ]
+            }
+        },
+        "ExtractTagsStepExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "states.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "ExtractTagsStepExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "StepExtractTagsExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "ExtractTagsStepExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "lambda:InvokeFunction"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "TagExtractorLambda",
+                                        "Arn"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "GetTags": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "TagExtractorStepFunction"
+            ],
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "get-tags-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "GetTagsExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "TAG_DATA_EXTRACT_SFN_ARN": {
+                            "Ref": "TagExtractorStepFunction"
+                        },
+                        "ResourceTypes": "rds:db,ec2:instance,ec2:volume,elasticloadbalancing:loadbalancer,route53:hostedzone,redshift:dbname",
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        }
+                    }
+                },
+                "Timeout": 15,
+                "Handler": "get-tags-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 128
+            }
+        },
+        "GetTagsExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "GetTagsExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W12",
+                            "reason": "* is the only accepted resource for DescribeRegions API call."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "GetTags"
+            ],
+            "Properties": {
+                "PolicyName": "GetTagsExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "GetTagsExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "states:StartExecution",
+                            "Resource": {
+                                "Ref": "TagExtractorStepFunction"
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "GetTags"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "GetTags"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Action": [
+                                "ec2:DescribeRegions"
+                            ],
+                            "Effect": "Allow",
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "TagMapOrganizationsStepFunction": {
+            "Type": "AWS::StepFunctions::StateMachine",
+            "Properties": {
+                "StateMachineName": "TagMapOrganizations",
+                "DefinitionString": {
+                    "Fn::Join": [
+                        "\n",
+                        [
+                            "{",
+                            "  \"StartAt\": \"MapOrganizations\",",
+                            "  \"States\": {",
+                            "    \"MapOrganizations\": {",
+                            "      \"Type\": \"Map\",",
+                            "      \"Iterator\": {",
+                            "         \"StartAt\": \"GetTags\",",
+                            "         \"States\": {",
+                            "           \"GetTags\": {",
+                            "             \"Type\": \"Task\",",
+                            {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "             \"Resource\": \"",
+                                        {
+                                            "Fn::GetAtt": [
+                                                "GetTags",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "\","
+                                    ]
+                                ]
+                            },
+                            "             \"End\": true,",
+                            "                        \"Retry\": [",
+                            "                            {",
+                            "                                \"ErrorEquals\": [",
+                            "                                    \"Lambda.TooManyRequestsException\"",
+                            "                                ],",
+                            "                                \"IntervalSeconds\": 2,",
+                            "                                \"MaxAttempts\": 6,",
+                            "                                \"BackoffRate\": 2",
+                            "                            },",
+                            "                          {",
+                            "                            \"ErrorEquals\": [\"States.ALL\"],",
+                            "                            \"IntervalSeconds\": 2,",
+                            "                            \"MaxAttempts\": 2,",
+                            "                            \"BackoffRate\": 2",
+                            "                          }",
+                            "                        ]",
+                            "           }",
+                            "         }",
+                            "      },",
+                            "      \"End\": true",
+                            "    }  ",
+                            "}",
+                            "}"
+                        ]
+                    ]
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "TagMapOrganizationsExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "ProjectName",
+                        "Value": "AWS Trusted Advisor Explorer"
+                    }
+                ]
+            }
+        },
+        "TagMapOrganizationsExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "states.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "TagMapOrganizationsExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "StepTagMapOrganizationsExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "TagMapOrganizationsExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "lambda:InvokeFunction"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "GetTags",
+                                        "Arn"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "GetAccountsLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "get-accounts-info-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "GetAccountsLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "BUCKET_NAME": {
+                            "Ref": "S3Bucket"
+                        },
+                        "FILE_OVERRIDE": "false",
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "OBJECT_NAME": "folder/accounts.csv",
+                        "EXTRACT_TA_DATA_SFN_ARN": {
+                            "Ref": "MapOrganizationsStepFunction"
+                        },
+                        "TAG_DATA_EXTRACT_SFN_ARN": {
+                            "Ref": "TagMapOrganizationsStepFunction"
+                        },
+                        "Tags": {
+                            "Ref": "InterestedTagKeys"
+                        },
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        },
+                        "AnonymousUsage": {
+                            "Fn::FindInMap": [
+                                "Send",
+                                "AnonymousUsage",
+                                "Data"
+                            ]
+                        },
+                        "UUID": {
+                            "Fn::GetAtt": [
+                                "UUIDGenerator",
+                                "UUID"
+                            ]
+                        },
+                        "Version": {
+                            "Fn::FindInMap": [
+                                "SourceCode",
+                                "General",
+                                "Version"
+                            ]
+                        }
+                    }
+                },
+                "Timeout": 60,
+                "Handler": "get-accounts-info-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 128
+            }
+        },
+        "GetAccountsLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "GetAccountsExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W12",
+                            "reason": "* is the only accepted resource for Organizations Describe & List APIs. Also, only one organization can exist per account hence, this should not be an issue."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "GetAccountsLambda",
+                "MapOrganizationsStepFunction"
+            ],
+            "Properties": {
+                "PolicyName": "awstrustedadvisorex-GetAccountsExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "GetAccountsLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "states:StartExecution",
+                            "Resource": [
+                                {
+                                    "Ref": "MapOrganizationsStepFunction"
+                                },
+                                {
+                                    "Ref": "TagMapOrganizationsStepFunction"
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:Get*",
+                                "s3:List*"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Ref": "S3Bucket"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Ref": "S3Bucket"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "organizations:Describe*",
+                                "organizations:List*"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "GetAccountsLambda"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "GetAccountsLambda"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "CronRule": {
+            "Type": "AWS::Events::Rule",
+            "DependsOn": [
+                "GetAccountsLambda"
+            ],
+            "Properties": {
+                "Description": "TrustedAdvisorExplorer Event Rule",
+                "ScheduleExpression": {
+                    "Ref": "ReportSchedule"
+                },
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Fn::GetAtt": [
+                                "GetAccountsLambda",
+                                "Arn"
+                            ]
+                        },
+                        "Id": "AWSTrustedAdExReportScheduler"
+                    }
+                ]
+            }
+        },
+        "InvokeLambdaPermissionGetAccounts": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "GetAccountsLambda",
+                        "Arn"
+                    ]
+                },
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {
+                    "Fn::GetAtt": [
+                        "CronRule",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "AWSTrustedAdvExDatabase": {
+            "Type": "AWS::Glue::Database",
+            "Properties": {
+                "CatalogId": {
+                    "Ref": "AWS::AccountId"
+                },
+                "DatabaseInput": {
+                    "Description": "AWS Trusted Advisor Explorer Database",
+                    "Name": "aws_trusted_advisor_explorer_db"
+                }
+            }
+        },
+        "AWSTrustedAdvExCrawlerRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "glue.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+                ]
+            }
+        },
+        "AWSTrustedAdvExCrawlerExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "AWSTrustedAdvEx-CrawlerExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "AWSTrustedAdvExCrawlerRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "glue:UpdateDatabase",
+                                "glue:UpdatePartition",
+                                "glue:CreateTable",
+                                "glue:UpdateTable",
+                                "glue:ImportCatalogToGlue"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":table/",
+                                            {
+                                                "Ref": "AWSTrustedAdvExDatabase"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":userDefinedFunction/",
+                                            {
+                                                "Ref": "AWSTrustedAdvExDatabase"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":database/",
+                                            {
+                                                "Ref": "AWSTrustedAdvExDatabase"
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":catalog"
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:PutObject"
+                            ],
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref": "S3Bucket"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "AWSTrustedAdvExCrawler": {
+            "Type": "AWS::Glue::Crawler",
+            "Properties": {
+                "DatabaseName": {
+                    "Ref": "AWSTrustedAdvExDatabase"
+                },
+                "Description": "This crawler that keeps your AWS Trusted Advisor Explorer table in Athena up-to-date",
+                "Name": "AWSTrustedAdvisorExplorer_Crawler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "AWSTrustedAdvExCrawlerRole",
+                        "Arn"
+                    ]
+                },
+                "Targets": {
+                    "S3Targets": [
+                        {
+                            "Path": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "S3Bucket"
+                                        },
+                                        "/TA-Reports/cost_optimizing"
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "SchemaChangePolicy": {
+                    "UpdateBehavior": "UPDATE_IN_DATABASE",
+                    "DeleteBehavior": "DELETE_FROM_DATABASE"
+                }
+            }
+        },
+        "AWSTrustedAdvExTagCrawler": {
+            "Type": "AWS::Glue::Crawler",
+            "Properties": {
+                "DatabaseName": {
+                    "Ref": "AWSTrustedAdvExDatabase"
+                },
+                "Description": "Recurring crawler that keeps your AWS Trusted Advisor Explorer table in Athena up-to-date",
+                "Name": "AWSTrustedAdvisorExplorer_Tags_Crawler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "AWSTrustedAdvExCrawlerRole",
+                        "Arn"
+                    ]
+                },
+                "Targets": {
+                    "S3Targets": [
+                        {
+                            "Path": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "S3Bucket"
+                                        },
+                                        "/Tags"
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "SchemaChangePolicy": {
+                    "UpdateBehavior": "UPDATE_IN_DATABASE",
+                    "DeleteBehavior": "DELETE_FROM_DATABASE"
+                },
+                "Schedule": {
+                    "ScheduleExpression": {
+                        "Ref": "GlueCrawlerSchedule"
+                    }
+                }
+            }
+        },
+        "MySNSTopic": {
+            "Type": "AWS::SNS::Topic",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W47",
+                            "reason": "We have included the steps to enable KMS key encryption in the solution documentation. Some the steps in the required functionility has dependency on other services/features that are not supported by CF."
+                        }
+                    ]
+                }
+            },
+            "Properties": {
+                "TopicName": "AWSTrustedAdvisorExplorer-DataRefresh",
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Ref": "SNSEmail"
+                        },
+                        "Protocol": "email"
+                    }
+                ]
+            }
+        },
+        "SNStopicpolicy": {
+            "Type": "AWS::SNS::TopicPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "AWSTrustedAdvisorExplorerSNSpolicy",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "events.amazonaws.com"
+                            },
+                            "Action": "sns:Publish",
+                            "Resource": {
+                                "Ref": "MySNSTopic"
+                            }
+                        }
+                    ]
+                },
+                "Topics": [
+                    {
+                        "Ref": "MySNSTopic"
+                    }
+                ]
+            }
+        },
+        "EventRule": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "Description": "Event Rule for successful Glue Crawler State",
+                "EventPattern": {
+                    "source": [
+                        "aws.glue"
+                    ],
+                    "detail-type": [
+                        "Glue Crawler State Change"
+                    ],
+                    "detail": {
+                        "state": [
+                            "Succeeded"
+                        ],
+                        "crawlerName": [
+                            {
+                                "Ref": "AWSTrustedAdvExCrawler"
+                            }
+                        ]
+                    }
+                },
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Ref": "MySNSTopic"
+                        },
+                        "Id": "MySNSTopic",
+                        "InputTransformer": {
+                            "InputPathsMap": {
+                                "crawlerName": "$.detail.crawlerName",
+                                "completionDate": "$.detail.completionDate",
+                                "cloudWatchLogLink": "$.detail.cloudWatchLogLink",
+                                "warningMessage": "$.detail.warningMessage",
+                                "tablesCreated": "$.detail.tablesCreated",
+                                "tablesUpdated": "$.detail.tablesUpdated",
+                                "tablesDeleted": "$.detail.tablesDeleted",
+                                "partitionsCreated": "$.detail.partitionsCreated",
+                                "partitionsUpdated": "$.detail.partitionsUpdated"
+                            },
+                            "InputTemplate": "\"Glue Crawler <crawlerName> has successfully refreshed new Trusted Advisor Data\"\n\n\"Event Details:-\"\n\"completionDate: <completionDate>\"\n\"cloudWatchLogLink: <cloudWatchLogLink>\"\n\"warningMessage: <warningMessage>\"\n\"tablesCreated: <tablesCreated>\"\n\"tablesUpdated: <tablesUpdated>\"\n\"tablesDeleted: <tablesDeleted>\"\n\"partitionsCreated: <partitionsCreated>\"\n\"partitionsUpdated: <partitionsUpdated>\""
+                        }
+                    },
+                    {
+                        "Arn": {
+                            "Fn::GetAtt": [
+                                "CreateAthenaViewLambda",
+                                "Arn"
+                            ]
+                        },
+                        "Id": "CreateAthenaViewLambda"
+                    }
+                ]
+            }
+        },
+        "MyAthenaWorkGroup": {
+            "Type": "AWS::Athena::WorkGroup",
+            "Properties": {
+                "Name": "AWSTrustedAvisorExplorer-AthenaWorkGroup",
+                "RecursiveDeleteOption": true,
+                "Description": "This is a custom workgroup created as part of AWS Trusted Advisor Explorer Solution",
+                "State": "ENABLED",
+                "WorkGroupConfiguration": {
+                    "EnforceWorkGroupConfiguration": true,
+                    "PublishCloudWatchMetricsEnabled": true,
+                    "ResultConfiguration": {
+                        "EncryptionConfiguration": {
+                            "EncryptionOption": "SSE_S3"
+                        },
+                        "OutputLocation": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    "s3://",
+                                    {
+                                        "Ref": "S3Bucket"
+                                    },
+                                    "/AthenaOutputs/"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "CreateAthenaViewLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "DependsOn": [
+                "CreateAthenaViewLambdaExecutionRole"
+            ],
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "create-athena-views-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "CreateAthenaViewLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "AthenaOutput": {
+                            "Ref": "S3Bucket"
+                        },
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "Tags": {
+                            "Ref": "InterestedTagKeys"
+                        },
+                        "AthenaDb": {
+                            "Ref": "AWSTrustedAdvExDatabase"
+                        },
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        },
+                        "AthenaWorkGroup": {
+                            "Ref": "MyAthenaWorkGroup"
+                        }
+                    }
+                },
+                "Timeout": 10,
+                "Handler": "create-athena-views-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 128
+            }
+        },
+        "CreateAthenaViewLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "CreateAthenaViewLambdaExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "CreateAthenaViewLambdaExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "CreateAthenaViewLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "CreateAthenaViewLambda"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "CreateAthenaViewLambda"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "athena:StartQueryExecution",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:athena:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":workgroup/",
+                                        {
+                                            "Ref": "MyAthenaWorkGroup"
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetBucketLocation",
+                                "s3:ListBucketMultipartUploads",
+                                "s3:ListMultipartUploadParts",
+                                "s3:AbortMultipartUpload",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:CreateBucket",
+                                "s3:GetObjectAcl",
+                                "s3:PutObject",
+                                "s3:PutObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Ref": "S3Bucket"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Ref": "S3Bucket"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "glue:CreateDatabase",
+                                "glue:DeleteDatabase",
+                                "glue:GetDatabase",
+                                "glue:GetDatabases",
+                                "glue:UpdateDatabase",
+                                "glue:CreateTable",
+                                "glue:DeleteTable",
+                                "glue:BatchDeleteTable",
+                                "glue:UpdateTable",
+                                "glue:GetTable",
+                                "glue:GetTables",
+                                "glue:BatchCreatePartition",
+                                "glue:CreatePartition",
+                                "glue:DeletePartition",
+                                "glue:BatchDeletePartition",
+                                "glue:UpdatePartition",
+                                "glue:GetPartition",
+                                "glue:GetPartitions",
+                                "glue:BatchGetPartition"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":table/",
+                                            {
+                                                "Ref": "AWSTrustedAdvExDatabase"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":userDefinedFunction/",
+                                            {
+                                                "Ref": "AWSTrustedAdvExDatabase"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":database/",
+                                            {
+                                                "Ref": "AWSTrustedAdvExDatabase"
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:glue:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":catalog"
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "PermissionForEventsToInvokeLambda": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "FunctionName": {
+                    "Ref": "CreateAthenaViewLambda"
+                },
+                "Action": "lambda:InvokeFunction",
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {
+                    "Fn::GetAtt": [
+                        "EventRule",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "EventRuleTACrawler": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "Description": "Event Rule to Trigger the TA Data Crawler",
+                "EventPattern": {
+                    "source": [
+                        "aws.glue"
+                    ],
+                    "detail-type": [
+                        "Glue Crawler State Change"
+                    ],
+                    "detail": {
+                        "state": [
+                            "Succeeded"
+                        ],
+                        "crawlerName": [
+                            {
+                                "Ref": "AWSTrustedAdvExTagCrawler"
+                            }
+                        ]
+                    }
+                },
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Fn::GetAtt": [
+                                "StartGlueCrawlerLambda",
+                                "Arn"
+                            ]
+                        },
+                        "Id": "TriggerGlueCrawler"
+                    }
+                ]
+            }
+        },
+        "StartGlueCrawlerLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "This lambda has permissions to write to CW Logs."
+                        }
+                    ]
+                }
+            },
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Join": [
+                            "-",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "S3Bucket"
+                                    ]
+                                },
+                                {
+                                    "Ref": "AWS::Region"
+                                }
+                            ]
+                        ]
+                    },
+                    "S3Key": {
+                        "Fn::Join": [
+                            "/",
+                            [
+                                {
+                                    "Fn::FindInMap": [
+                                        "SourceCode",
+                                        "General",
+                                        "KeyPrefix"
+                                    ]
+                                },
+                                "start-crawler-lambda.zip"
+                            ]
+                        ]
+                    }
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "StartGlueCrawlerLambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Environment": {
+                    "Variables": {
+                        "LOG_LEVEL": {
+                            "Ref": "LogLevel"
+                        },
+                        "MASK_PII": {
+                            "Ref": "MaskAccountInformation"
+                        },
+                        "CrawlerName": {
+                            "Ref": "AWSTrustedAdvExCrawler"
+                        }
+                    }
+                },
+                "Timeout": 60,
+                "Handler": "start-crawler-lambda.lambda_handler",
+                "Runtime": "python3.8",
+                "MemorySize": 128
+            }
+        },
+        "StartGlueCrawlerLambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "StartGlueCrawlerLambdaExecutionPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": [
+                "StartGlueCrawlerLambda"
+            ],
+            "Properties": {
+                "PolicyName": "AWSTrustedAdEx-StartGlueCrawlerLambdaExecutionPolicy",
+                "Roles": [
+                    {
+                        "Ref": "StartGlueCrawlerLambdaExecutionRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:logs:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":*"
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "StartGlueCrawlerLambda"
+                                            },
+                                            ":*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:logs:",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ":",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":log-group:/aws/lambda/",
+                                            {
+                                                "Ref": "StartGlueCrawlerLambda"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "glue:StartCrawler",
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        "arn:aws:glue:",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        ":",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        ":crawler/",
+                                        {
+                                            "Ref": "AWSTrustedAdvExCrawler"
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectTagging",
+                                "s3:ListBucket",
+                                "s3:GetObjectAcl"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Fn::FindInMap": [
+                                                    "SourceCode",
+                                                    "General",
+                                                    "S3Bucket"
+                                                ]
+                                            },
+                                            "-",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "PermissionForEventsToInvokeGlueLambda": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "FunctionName": {
+                    "Ref": "StartGlueCrawlerLambda"
+                },
+                "Action": "lambda:InvokeFunction",
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {
+                    "Fn::GetAtt": [
+                        "EventRuleTACrawler",
+                        "Arn"
+                    ]
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "RawTADataBucketName": {
+            "Description": "The name of the bucket in which the raw Trusted Advisor check data & Tag information will be stored",
+            "Value": {
+                "Ref": "S3Bucket"
+            }
+        },
+        "SNSTopic": {
+            "Description": "The name of the SNS topic that will be notified after every data refresh.",
+            "Value": {
+                "Ref": "MySNSTopic"
+            }
+        },
+        "AthenaDatabase": {
+            "Description": "The name of the Athena database.",
+            "Value": {
+                "Ref": "AWSTrustedAdvExDatabase"
+            }
+        },
+        "UUID": {
+            "Description": "Newly created random UUID.",
+            "Value": {
+                "Fn::GetAtt": [
+                    "UUIDGenerator",
+                    "UUID"
+                ]
+            }
+        }
+    }
+}
