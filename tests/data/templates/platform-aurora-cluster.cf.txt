@@ -1,0 +1,351 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "CloudFormation template for creating an Aurora Serverless V2 Cluster"
+# For referenfce there's a substantial difference between Aurora V1 (Serverless) and Aurora V2 (Provisioned).
+# Serverless allows massive scaling, up and down, very quickly depending on needs. Aurora V2 is like a traditional EC2 Autoscaling group, your DB will scale with actual RDS instances so it can take a few minutes to scale up and down.
+# There are substantial differences between V1 & V2 Aurora clusters documented here:
+# 1. Aurora V1 Serverless: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless.html
+# 2. Aurora V2 Provisoned: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.html
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: "Tagging"
+        Parameters:
+          - "RegionTag"
+          - "CustomerTag"
+          - "EnvironmentTag"
+          - "ServiceLayerTag"
+          - "StackInteger"
+          - "InfrastructureReleaseTag"
+      - Label:
+          default: "VPC Configuration"
+        Parameters:
+          - VpcId
+          - SubnetPrivate1
+          - SubnetPrivate2
+      - Label:
+          default: "RDS Configuration"
+        Parameters:
+          - DBSnapshotIdentifier
+          - DBMasterUsername
+          - EngineVersion
+          - AuroraMinCapacity
+          - AuroraMaxCapacity
+          - AuroraBackupsBucketName
+
+  cfn-lint:
+    config:
+      ignore_checks:
+        - "W2001"
+        - "I3042"
+
+Parameters:
+  # Tagging Parameters
+  RegionTag:
+    Type: "String"
+    Description: "Region tag used for StackName and tagging"
+
+  StackInteger:
+    Type: "String"
+    Description: "StackInteger tag"
+    AllowedPattern: ^\d+$
+
+
+  EnvironmentTag:
+    Type: 'String'
+    Description: "Environment tag used to create the StackName and tagging"
+    AllowedValues: [ 'IN', 'BR', 'DV', 'BU', 'UA', 'PR' ]
+
+  CustomerTag:
+    Type: "String"
+    Description: "Customer tag used to create StackName and resource tagging"
+    AllowedValues:
+      - "DA"
+      - "GL"
+      - "DG"
+
+  # Semantic versioning should be used for infrastructure release tagging:
+  # increment the patch version (e.g. from 2.3.4 to 2.3.5) when you only release bug fixes and the like
+  # increment the minor version (e.g. from 1.3.2 to 1.4.0) when you add new features
+  # increment the major version (e.g. from 3.2.9 to 4.0.0) when you introduce breaking changes
+
+  InfrastructureReleaseTag:
+    Type: "String"
+    Description: "Release tag (n.n.n) used to signify the stack/version or release an environment is running on, optionally used in a StackName but is not mandatory"
+    AllowedPattern: ^(\d+).(\d+).(\d+)$
+
+  ServiceLayerTag:
+    Type: "String"
+    Description: "Tag to describe where in the service architecture a particular resource exists"
+    AllowedValues: [ "FabricLayer", "Application", "LegacyPlatform", "NewPlatform", "Proxy" ]
+    Default: "NewPlatform"
+
+  AuroraBackupsBucketName:
+    Description: "The bucket used to store Aurora snapshots/backups"
+    Type: "String"
+
+  AuroraMinCapacity:
+    Description: "The aurora scaling max capacity value, refer to here for doco: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.setting-capacity.html#aurora-serverless-v2.max_capacity_considerations"
+    Type: "String"
+    Default: 1
+
+  AuroraMaxCapacity:
+    Description: "The aurora scaling max capacity value, refer to here for doco: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.setting-capacity.html#aurora-serverless-v2.max_capacity_considerations"
+    Type: "String"
+    Default: 10
+
+  AuroraSQLSecretARN:
+    Description: "The ARN of the secrets resource that contains the password for the master user in the Aurora PostgreSQL cluster"
+    Type: "String"
+
+  DBName:
+    Description: "The name of the DB in the PostgreSQL Aurora cluster"
+    Type: "String"
+    Default: "DingoPlatformDatabase"
+
+  DBSnapshotIdentifier:
+    Description: 'Optional name or Amazon Resource Name (ARN) of the DB snapshot from which you want to restore (leave blank to create an empty database).'
+    Type: 'String'
+    Default: ''
+
+  DBMasterUsername:
+    Description: 'The master user name for the DB instance (ignored when DBSnapshotIdentifier is set, value used from snapshot).'
+    Type: 'String'
+    Default: 'master'
+
+  EngineVersion:
+    Description: 'The DB engine to use for the Aurora Serverless cluster'
+    Type: 'String'
+
+  SubnetPrivate1:
+    Type: "AWS::EC2::Subnet::Id"
+    Description: "Backend subnet (AZ1)"
+    AllowedPattern: ^subnet-[0-9A-Za-z]+$
+
+  SubnetPrivate2:
+    Type: "AWS::EC2::Subnet::Id"
+    Description: "Backend subnet (AZ2)"
+    AllowedPattern: ^subnet-[0-9A-Za-z]+$
+
+  SubnetPrivate1AvailabilityZone:
+    Type: "String"
+    Description: "The availability zone of the private subnet 1"
+
+  SubnetPrivate2AvailabilityZone:
+    Type: "String"
+    Description: "The availability zone of the private subnet 1"
+
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+    Description: "VPC into which the cluster should be deployed"
+    AllowedPattern: ^vpc-[0-9A-Za-z]+$
+
+  VpcCidr:
+    Type: "String"
+    Description: "The CIDR of the VPC that these resources will reside in, used for security groups"
+
+Conditions:
+  DBSnapshotIdentifierIsBlank: !Equals [!Ref DBSnapshotIdentifier, '']
+  HasDBSnapshotIdentifier: !Not [!Condition DBSnapshotIdentifierIsBlank]
+  IsFakedBranchEnvironment:
+    !Or
+      - !Equals
+        - !Ref EnvironmentTag
+        - "BR"
+      - !Equals
+        - !Ref EnvironmentTag
+        - "UB"
+
+Resources:
+  ################################################################################
+  # RDS Resources
+  ################################################################################
+
+  PostgreSQLRDSSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: RDS Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: "PostgreSQL DB Connection, inbound"
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref VpcCidr
+
+  RDSDBCluster:
+    DeletionPolicy: !If
+      - IsFakedBranchEnvironment
+      - "Delete"
+      - "Retain"
+    UpdateReplacePolicy: !If
+      - IsFakedBranchEnvironment
+      - "Delete"
+      - "Retain"
+    Type: 'AWS::RDS::DBCluster'
+    Properties:
+      AssociatedRoles:
+        - FeatureName: s3Export
+          RoleArn: !GetAtt AuroraRole.Arn
+        #- FeatureName: s3Import
+        #  RoleArn: !GetAtt AuroraRole.Arn
+      Port: 5432
+      DeletionProtection: false #!TODO change to true when ready for PR
+      StorageEncrypted: true
+      DatabaseName: !Ref DBName
+      Engine: aurora-postgresql
+      EngineMode: provisioned
+      EngineVersion: !Ref EngineVersion
+      DBClusterIdentifier: !Sub ${AWS::StackName}
+      MasterUserSecret:
+        SecretArn: !Ref AuroraSQLSecretARN
+      #SecondsBeforeTimeout: 300 # default value is 300
+      BackupRetentionPeriod: 35 # max value is 35, if backups are wanted for longer, we need to leverape Auroras ability to backup snapshots to AWS S3
+      StorageType: "aurora" # or aurora-iopt1 for IO intensive workloads
+      SnapshotIdentifier: !If [HasDBSnapshotIdentifier, !Ref 'DBSnapshotIdentifier', !Ref AWS::NoValue] # Never remove this value! If you do so, the cluster will be replaced with an empty cluster.
+      # From AWS Docs:After you restore a DB cluster with a SnapshotIdentifier property, you must specify the same SnapshotIdentifier property for any future updates to the DB cluster.
+      # When you specify this property for an update, the DB cluster is not restored from the snapshot again, and the data in the database is not changed.
+      # However, if you don't specify the SnapshotIdentifier property, an empty DB cluster is created, and the original DB cluster is deleted.
+      # If you specify a property that is different from the previous snapshot restore property, a new DB cluster is restored from the specified SnapshotIdentifier property, and the original DB cluster is deleted.
+      DBSubnetGroupName: !Ref DBInstanceSubnetGroup
+      VpcSecurityGroupIds: [!Ref PostgreSQLRDSSecurityGroup]
+      #EnableIAMDatabaseAuthentication: true # might be worth investigating later
+      #EnableCloudwatchLogsExports: [postgresql] #"Aurora Serverless currently doesn't support CloudWatch Log Export"
+      AutoMinorVersionUpgrade: true
+      PreferredBackupWindow: "00:00-01:00" # UTC time, equivalent to 10:00->11:00 Brisbane Time
+      PreferredMaintenanceWindow: "Mon:02:00-Mon:04:00" # UTC time, equivalent to 12:00 -> 14:00 Brisbane Time
+      CopyTagsToSnapshot: true
+      NetworkType: "IPV4"
+      AvailabilityZones:
+        - !Ref SubnetPrivate1AvailabilityZone
+        - !Ref SubnetPrivate2AvailabilityZone
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${AWS::StackName}-RDS-Password"
+        - Key: "EnvironmentTag"
+          Value: !Ref "EnvironmentTag"
+        - Key: "CustomerTag"
+          Value: !Ref "CustomerTag"
+        - Key: "InfrastructureReleaseTag"
+          Value: !Ref "InfrastructureReleaseTag"
+        - Key: "RegionTag"
+          Value: !Ref "RegionTag"
+        - Key: "ServiceLayerTag"
+          Value: !Ref "ServiceLayerTag"
+        - Key: "StackInteger"
+          Value: !Ref "StackInteger"
+        - Key: "StackName"
+          Value: !Sub "${AWS::StackName}"
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref AuroraMinCapacity
+        MaxCapacity: !Ref AuroraMaxCapacity
+
+  DBInstanceSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Aurora Subnet Group for platform app server stacks"
+      DBSubnetGroupName: !Sub "${AWS::StackName}-DBSubnetGroup"
+      SubnetIds:
+        - !Ref "SubnetPrivate1"
+        - !Ref "SubnetPrivate2"
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${AWS::StackName}-ADO-PAT"
+        - Key: "EnvironmentTag"
+          Value: !Ref "EnvironmentTag"
+        - Key: "CustomerTag"
+          Value: !Ref "CustomerTag"
+        - Key: "InfrastructureReleaseTag"
+          Value: !Ref "InfrastructureReleaseTag"
+        - Key: "RegionTag"
+          Value: !Ref "RegionTag"
+        - Key: "ServiceLayerTag"
+          Value: !Ref "ServiceLayerTag"
+        - Key: "StackInteger"
+          Value: !Ref "StackInteger"
+        - Key: "StackName"
+          Value: !Sub "${AWS::StackName}"
+
+  AuroraRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "rds.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Description: "Use for RDS Proxy"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole'
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-cluster-db-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Effect: Allow
+              Action:
+                - "secretsmanager:GetSecretValue"
+              Resource: !Ref AuroraSQLSecretARN
+            - Effect: Allow
+              Action:
+                - "kms:Decrypt"
+              Resource: !Ref AuroraSQLSecretARN
+              Condition:
+                StringEquals:
+                  kms:ViaService: !Sub "secretsmanager.${AWS::Region}.amazonaws.com"
+            - Effect: "Allow"
+              Action:
+                - "s3:GetBucketLocation"
+              Resource:
+                - !Sub "arn:aws:s3:::${AuroraBackupsBucketName}"
+            - Effect: "Allow"
+              Action:
+                - "s3:ListBucket"
+              Resource:
+                - !Sub "arn:aws:s3:::${AuroraBackupsBucketName}"
+            - Effect: "Allow"
+              Action:
+                - "s3:GetObject"
+              Resource:
+                - !Sub "arn:aws:s3:::${AuroraBackupsBucketName}/*"
+            - Effect: "Allow"
+              Action:
+                - "s3:PutObject"
+              Resource:
+                - !Sub "arn:aws:s3:::${AuroraBackupsBucketName}/*"
+      Path: /
+      RoleName: !Sub "${AWS::StackName}-AuroraRole"
+
+Outputs:
+  AuroraRoleArn:
+    Description: "Returns the ARN of the Aurora Role used for this cluster"
+    Value: !GetAtt AuroraRole.Arn
+  ClusterName:
+    Description: "Returns the Cluster name"
+    Value: !Ref RDSDBCluster
+  ClusterArn:
+    Description: "The ARN of the DB ClusterL"
+    Value: !GetAtt RDSDBCluster.DBClusterArn
+  DBEndpoint:
+    Description: "The RDS DB enpoint from this stack"
+    Value: !GetAtt RDSDBCluster.Endpoint.Address
+  DBName:
+    Description: 'The name of the Database managed by AWS Aurora'
+    Value: !Ref DBName
+  DBPort:
+    Description: "The RDS DB port from this stack"
+    Value: !GetAtt RDSDBCluster.Endpoint.Port
+  EngineVersion:
+    Description: "The PostgreSQL Engine version we're using"
+    Value: !Ref EngineVersion
+  InstanceName:
+    Description: 'The name of the database instance.'
+    Value: !Ref RDSDBCluster
+  PostgreSQLRDSSecurityGroupId:
+    Description: 'The security group used to manage access to RDS Postgres.'
+    Value: !GetAtt PostgreSQLRDSSecurityGroup.GroupId

@@ -1,0 +1,372 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Automated Image Scan Compliance for AWS EKS using AWS ECR and AWS Security Hub
+
+# ----------------------------------------------------------------------------------------------------------
+#  CloudFormation Template 1 of 1 - 
+#   
+#  
+#  1- Provisions CloudWatchEvents (EventBridge) Rule:
+#    - CloudWatchEvents Rule is triggered based on a AWS ECR Event for a completed Image Scan
+#  2- Provisions a Compliance Lambda as a target for the CloudWatch Events Rule.
+#  3- Compliance Lambda: 
+#   - Obtains event details from the ECR Complated Image scan event
+#   - Creates a finding in AWS Security Hub
+#  4 - Provisions an AWS Security Hub Custom Action
+#    - Performs remediation by attaching restricted policy to ECR repository
+# 
+# 
+# @kmmahaj
+##
+## License:
+## This code is made available under the MIT-0 license. See the LICENSE file.
+# ------------------------------------------------------------...............................................
+
+ 
+Resources:
+
+# --------------------------------------------------------------------------------------------------
+#  1- Provisions a CloudWatchEvents Rule that is triggered based on ECR Image Scan Event
+#  2- Provisions a Lambda that creates a finding in AWS Security Hub 
+# --------------------------------------------------------------------------------------------------
+
+  CaptureECRImageScanEvents:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Capture ECR Scan Events and Trigger an Action
+      EventPattern:
+        detail-type:
+          - ECR Image Scan
+        source:
+          - aws.ecr
+      Name: CaptureECRScanEvent
+      State: ENABLED
+      Targets:
+      - Arn: !GetAtt "ECRToSecHubSendFindingsLambda.Arn"
+        Id: IDCaptureECRImageScanEvents
+
+  ECRToSecHubSendFindingsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ECR2SecurityHubSendFindingsLambda
+      Description: Maps ECR Scan Finding into ASFF before importing to Security Hub
+      Handler: index.lambda_handler
+      MemorySize: 384
+      Role: !GetAtt ECRToSecHubSendFindingsLambdaRole.Arn
+      Runtime: python3.7
+      Timeout: 70
+      Environment:
+        Variables:
+          account_num: !Ref 'AWS::AccountId'
+          region: !Ref 'AWS::Region'
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import datetime
+          import uuid
+          import os
+          def lambda_handler(event, context):
+              # import Lambda ENV VARs
+              accountId = os.environ['account_num']
+              awsRegion = os.environ['region']
+              # Get ECR event details
+              eventDetails = event['detail']
+              repoName = eventDetails['repository-name']
+              findingsevcounts = eventDetails['finding-severity-counts']
+              numCritical = 0
+              numMedium = 0
+              numHigh = 0
+              if findingsevcounts.get('CRITICAL'):
+                  numCritical = findingsevcounts['CRITICAL']
+              if findingsevcounts.get('MEDIUM'):
+                  numMedium = findingsevcounts['MEDIUM']
+              if findingsevcounts.get('HIGH'):
+                  numHigh = findingsevcounts['HIGH']
+                          
+              # send finding to Security Hub
+              severity = "LOW"
+              title = "ECR Finding"
+              ECRComplianceRating = 'PASSED'
+              if numMedium:
+                  severity = "MEDIUM"
+                  title = "Medium ECR Vulnerability"
+                  ECRComplianceRating = 'FAILED'
+              if numHigh:
+                  severity = "HIGH"
+                  title = "High ECR Vulnerability"
+                  ECRComplianceRating = 'FAILED'
+              if numCritical:
+                  severity = "CRITICAL"
+                  title = "Critical ECR Vulnerability"
+                  ECRComplianceRating = 'FAILED'
+
+
+              # ISO Time
+              iso8061Time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
+              # ASFF BIF Id
+              asffID = str(uuid.uuid4())
+              # import security hub boto3 client
+              sechub = boto3.client('securityhub')
+              # call BIF
+              try:
+                  response = sechub.batch_import_findings(
+                      Findings=[
+                          {
+                              'SchemaVersion': '2018-10-08',
+                              'Id': asffID,
+                              'ProductArn': 'arn:aws:securityhub:' + awsRegion + ':' + accountId + ':product/' + accountId + '/default',
+                              'ProductFields': {
+                                  'ECRRepoName': repoName,
+                              },
+                              'GeneratorId': asffID,
+                              'AwsAccountId': accountId,
+                              'Types': [ 'Software and Configuration Checks' ],
+                              'FirstObservedAt': iso8061Time,
+                              'UpdatedAt': iso8061Time,
+                              'CreatedAt': iso8061Time,
+                              'Severity': {
+                                  'Label': severity
+                              },
+                              'Title': title,
+                              'Description': title,
+                              'Resources': [
+                                  {
+                                      'Type': 'AwsEcr',
+                                      'Id': 'AWS::::Account:' + accountId,
+                                      'Partition': 'aws',
+                                      'Region': awsRegion,
+                                  }
+                              ],
+                              'WorkflowState': 'NEW',
+                              'Compliance': {'Status': ECRComplianceRating},
+                              'RecordState': 'ACTIVE'
+                          }
+                      ]
+                  )
+                  print(response)
+              except Exception as e:
+                  print(e)
+                  print("Submitting finding to Security Hub failed, please troubleshoot further")
+                  raise
+  
+  ECRToSecHubSendFindingsLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+      - PolicyName: ECRToSecHubSendFindingsLambda-Policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            - securityhub:BatchImportFindings
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: { Service: lambda.amazonaws.com }
+          Action:
+          - sts:AssumeRole
+
+  PermissionForEventsToInvokeLambdachk:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt "ECRToSecHubSendFindingsLambda.Arn"
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt "CaptureECRImageScanEvents.Arn"
+
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------
+# 3. Create Remediation in Security Hub
+# -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  CreateSecurityHubCustomActionTargetLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CreateSecurityHubCustomActionTargetLambda-ECR
+      Description: Custom resource to create an action target in Security Hub
+      Handler: index.lambda_handler
+      MemorySize: 256
+      Role: !GetAtt CreateSecurityHubCustomActionTargetLambdaRole.Arn
+      Runtime: python3.7
+      Timeout: 60
+      Environment:
+        Variables:
+          Region: !Ref 'AWS::Region'
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import os
+          def lambda_handler(event, context):
+              try:
+                  properties = event['ResourceProperties']
+                  region = os.environ['Region']
+                  client = boto3.client('securityhub', region_name=region)
+                  responseData = {}
+                  if event['RequestType'] == 'Create':
+                      response = client.create_action_target(
+                          Name=properties['Name'],
+                          Description=properties['Description'],
+                          Id=properties['Id']
+                      )
+                      responseData['Arn'] = response['ActionTargetArn']
+                  elif event['RequestType'] == 'Delete':
+                      account_id = context.invoked_function_arn.split(":")[4]
+                      client.delete_action_target(
+                          ActionTargetArn=f"arn:aws:securityhub:{region}:{account_id}:action/custom/{properties['Id']}"
+                      )
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+              except Exception as e:
+                  print(e)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+  
+  CreateSecurityHubCustomActionTargetLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+      - PolicyName: CreateActionTarget-LambdaPolicy-ECR
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - securityhub:CreateActionTarget
+            - securityhub:DeleteActionTarget
+            Resource: '*'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: { Service: lambda.amazonaws.com }
+          Action:
+          - sts:AssumeRole
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------
+# Create Remediation to deny ECR repository access 
+# -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  ECRAccessProhibitedRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Name: ECRAccessProhibitedRule
+      Description: "ECR1 - Deny Access to ECR due to vulnerability assesment"
+      EventPattern: 
+        source: 
+          - aws.securityhub
+        detail-type: 
+          - Security Hub Findings - Custom Action
+        resources: 
+          - !GetAtt ECRActionTarget.Arn
+      State: "ENABLED"
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "ECRAccessProhibitedLambda"
+              - "Arn"
+          Id: "ECR1"
+  
+  ECRActionTarget:
+    Type: Custom::ActionTarget
+    Version: 1.0
+    Properties:
+      ServiceToken: !GetAtt CreateSecurityHubCustomActionTargetLambda.Arn
+      Name: ECR1
+      Description: Deny Access to ECR
+      Id: ECR11
+
+  ECRAccessProhibitedLambdaPermission: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: 
+        Ref: "ECRAccessProhibitedLambda"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: 
+        Fn::GetAtt: 
+          - "ECRAccessProhibitedRule"
+          - "Arn"
+
+  ECRAccessProhibitedLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ECRAccessProhibitedLambda
+      Description: "ECR1 - Deny Access to ECR due to vulnerability assesment"
+      Handler: index.lambda_handler
+      MemorySize: 256
+      Role: !GetAtt  ECRAccessProhibitedLambdaRole.Arn
+      Runtime: python3.7
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import os
+          def lambda_handler(event, context):
+    
+              repoName = str(event['detail']['findings'][0]['ProductFields']['ECRRepoName'])
+              ecr = boto3.client('ecr')
+              try:
+                  policyText = '{\n  "Version" : "2008-10-17",\n  "Statement" : [ {\n    "Sid" : "deny all",\n    "Effect" : "Deny",\n    "Principal" : "*",\n "Action" : [ "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage", "ecr:BatchCheckLayerAvailability" ]\n } ]\n}'
+                  response = ecr.set_repository_policy(
+                      repositoryName=repoName,
+                      policyText=policyText
+                  )
+        
+              except Exception as e:
+                  print(e)
+                  print("SSM automation execution error")
+                  raise
+
+  ECRAccessProhibitedLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+      - PolicyName: ECRAccessProhibitedLambdaPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - ssm:StartAutomationExecution
+            - ecr:*
+            - iam:PassRole
+            - securityhub:UpdateFindings
+            Resource: '*'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: { Service: lambda.amazonaws.com }
+          Action:
+          - sts:AssumeRole

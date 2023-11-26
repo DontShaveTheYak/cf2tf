@@ -1,0 +1,26 @@
+Resources:
+  MyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /MyStack/MyParameter
+      Type: String
+      Value: 'default-value'
+  MyInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-01010101010101
+      InstanceType: t2.micro
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo "MyParameter value is ${MyParameter}" >> /var/log/user-data.log
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          default:
+            - myConfig
+        myConfig:
+          commands:
+            01_set_param:
+              command: !Sub |
+                aws ssm put-parameter --name /MyStack/MyParameter --value "new-value" --type "String"

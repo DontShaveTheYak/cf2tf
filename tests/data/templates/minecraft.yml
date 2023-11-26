@@ -1,0 +1,770 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Minecraft Spot Price Server via Docker / ECS
+Parameters:
+
+  ECSAMI:
+    Description: AWS ECS AMI ID
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+
+  ServerState:
+    Type: String
+    Description: "Running: A spot instance will launch shortly after setting this parameter; your Minecraft server should start within 5-10 minutes of changing this parameter (once UPDATE_IN_PROGRESS becomes UPDATE_COMPLETE). Stopped: Your spot instance (and thus Minecraft container) will be terminated shortly after setting this parameter."
+    Default: Running
+    AllowedValues:
+    - Running
+    - Stopped
+
+  InstanceType:
+    Type: String
+    Description: "t3.medium is a good cost-effective instance, 2 vCPUs and 3.75 GB of RAM with moderate network performance. Change at your discretion. https://aws.amazon.com/ec2/instance-types/."
+    Default: t3.medium
+
+  SpotPrice:
+    Type: String
+    Description: "A t3.medium shouldn't cost much more than a cent per hour. Note: Leave this blank to use on-demand pricing."
+    Default: "0.05"
+
+  ContainerInsights:
+    Type: String
+    Description: "Enable/Disable ECS Container Insights for ECS Cluster"
+    Default: disabled
+    AllowedValues:
+    - enabled
+    - disabled
+
+  EntryPoint:
+    Type: CommaDelimitedList
+    Description: "Task entrypoint (Optional - image default is script /start)"
+
+  Command:
+    Type: CommaDelimitedList
+    Description: "Task command (Optional - image default is empty)"
+
+  LogGroupName:
+    Type: String
+    Description: (Optional - An empty value disables this feature)
+    Default: ''
+
+  LogGroupRetentionInDays:
+    Type: Number
+    Description: (Log retention in days)
+    Default: 7
+
+  LogStreamPrefix:
+    Type: String
+    Description: (Optional)
+    Default: 'minecraft-server'
+
+  KeyPairName:
+    Type: String
+    Description: (Optional - An empty value disables this feature)
+    Default: ''
+
+  YourIPv4:
+    Type: String
+    Description: (Optional - An empty value disables this feature)
+    Default: ''
+
+  YourIPv6:
+    Type: String
+    Description: (Optional - An empty value disables this feature)
+    Default: ''
+
+  HostedZoneId:
+    Type: String
+    Description: (Optional - An empty value disables this feature) If you have a hosted zone in Route 53 and wish to set a DNS record whenever your Minecraft instance starts, supply the hosted zone ID here.
+    Default: ''
+
+  RecordName:
+    Type: String
+    Description: (Optional - An empty value disables this feature) If you have a hosted zone in Route 53 and wish to set a DNS record whenever your Minecraft instance starts, supply the name of the record here (e.g. minecraft.mydomain.com).
+    Default: ''
+
+  MinecraftImageTag:
+    Type: String
+    Description: "Java version (Examples include latest, adopt13, openj9, etc) Refer to tag descriptions available here: https://github.com/itzg/docker-minecraft-server)"
+    Default: 'latest'
+
+  MinecraftTypeTag:
+    Type: String
+    Description: "(Examples include SPIGOT, BUKKIT, TUINITY, etc) Refer to tag descriptions available here: https://github.com/itzg/docker-minecraft-server)"
+
+  AdminPlayerNames:
+    Type: String
+    Description: Op/Administrator Players
+    Default: ''
+
+  Difficulty:
+    Type: String
+    Description: "The game's difficulty"
+    Default: normal
+    AllowedValues:
+    - peaceful
+    - easy
+    - normal
+    - hard
+
+  Whitelist:
+    Type: String
+    Description: Usernames of your friends
+    Default: ''
+
+  MinecraftVersion:
+    Type: String
+    Description: Server minecraft version
+    Default: ''
+
+  Memory:
+    Type: String
+    Description: How much Memory to allocate for the JVM
+    Default: '1G'
+
+  Seed:
+    Type: String
+    Description: The seed used to generate the world
+
+  MaxPlayers:
+    Type: Number
+    Description: Max number of players that can connect simultaneously (default 20)
+    Default: -1
+
+  ViewDistance:
+    Type: Number
+    Description: Max view radius (in chunks) the server will send to the client (default 10)
+    Default: -1
+
+  GameMode:
+    Type: String
+    Description: "Options: creative, survival (default), adventure, spectator (v1.8+)"
+    Default: survival
+    AllowedValues:
+    - creative
+    - survival
+    - adventure
+    - spectator
+
+  LevelType:
+    Type: String
+    Description: "Options: DEFAULT, FLAT, LARGEBIOMES, AMPLIFIED, CUSTOMIZED, BUFFET, BIOMESOP (v1.12-), BIOMESOPLENTY (v1.15+)"
+    Default: DEFAULT
+    AllowedValues:
+    - DEFAULT
+    - FLAT
+    - LARGEBIOMES
+    - AMPLIFIED
+    - CUSTOMIZED
+    - BUFFET
+    - BIOMESOP
+    - BIOMESOPLENTY
+
+  EnableRollingLogs:
+    Type: String
+    Description: "By default the log file will grow without limit. Set to true to use a rolling log strategy."
+    Default: false
+    AllowedValues:
+    - true
+    - false
+
+  Timezone:
+    Type: String
+    Description: "Change the server's timezone. Use the canonical name of the format: Area/Location (e.g. America/New_York)"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Essential Configuration
+        Parameters:
+        - ServerState
+        - InstanceType
+        - SpotPrice
+      - Label:
+          default: Server Settings
+        Parameters:
+        - MinecraftImageTag
+      - Label:
+          default: Optional Server Settings
+        Parameters:
+        - MinecraftTypeTag
+        - AdminPlayerNames
+        - Difficulty
+        - Whitelist
+        - MinecraftVersion
+        - Memory
+        - Seed
+        - MaxPlayers
+        - ViewDistance
+        - GameMode
+        - LevelType
+        - EnableRollingLogs
+        - Timezone
+      - Label:
+          default: Optional ECS Cluster and Task Configuration
+        Parameters:
+        - ContainerInsights
+        - EntryPoint
+        - Command
+        - LogGroupName
+        - LogGroupRetentionInDays
+        - LogStreamPrefix
+      - Label:
+          default: Optional Remote Access (SSH) Configuration
+        Parameters:
+        - KeyPairName
+        - YourIPv4
+        - YourIPv6
+      - Label:
+          default: Optional DNS Configuration
+        Parameters:
+        - HostedZoneId
+        - RecordName
+    ParameterLabels:
+      ServerState:
+        default: "Update this parameter to shut down / start up your Minecraft server as required to save on cost. Takes a few minutes to take effect."
+      InstanceType:
+        default: "Which instance type? You must make sure this is available in your region! https://aws.amazon.com/ec2/pricing/on-demand/"
+      SpotPrice:
+        default: "Maximum spot price per hour? Leave blank to disable spot pricing."
+      MinecraftImageTag:
+        default: "Which version of Minecraft do you want to launch?"
+      MinecraftTypeTag:
+        default: "Which type of Minecraft do you want to launch?"
+      AdminPlayerNames:
+        default: "A comma delimited list (no spaces) of player names to be admins"
+      Difficulty:
+        default: "Which difficulty?"
+      Whitelist:
+        default: "A comma delimited list (no spaces) of player names"
+      MinecraftVersion:
+        default: "Minecraft version ie 1.16.3"
+      ContainerInsights:
+        default: "ECS Container Insights provide additional container metrics, and supports collection of Prometheus metrics.  Additional AWS charges may apply."
+      EntryPoint:
+        default: "Task/container --entrypoint, comma separated e.g. /bin/bash,-c"
+      Command:
+        default: "Task/container command, comma separated arguments passed to entrypoint"
+      LogGroupName:
+        default: "Create CloudWatch Log Group with this name e.g. /Minecraft or /ecs/minecraft, and direct container logs there"
+      LogGroupRetentionInDays:
+        default: "Number of days to retain CloudWatch logs"
+      LogStreamPrefix:
+        default: "Prefix for container log stream e.g. minecraft-server"
+      KeyPairName:
+        default: "If you wish to access the instance via SSH, select a Key Pair to use. https://console.aws.amazon.com/ec2/v2/home?#KeyPairs:sort=keyName"
+      YourIPv4:
+        default: "If you wish to access the instance via SSH and using IPv4, provide it."
+      YourIPv6:
+        default: "If you wish to access the instance via SSH and using IPv6, provide it."
+      HostedZoneId:
+        default: "If you have a hosted zone in Route 53 and wish to update a DNS record whenever your Minecraft instance starts, supply the hosted zone ID here."
+      RecordName:
+        default: "If you have a hosted zone in Route 53 and wish to set a DNS record whenever your Minecraft instance starts, supply a record name here (e.g. minecraft.mydomain.com)."
+      Memory:
+        default: "If you wish to increase the Java memory-heap limit of 1GB. Format: <size>[g|G|m|M|k|K]"
+      Seed:
+        default: "Seed for world generation"
+      MaxPlayers:
+        default: "Max simultaneous players"
+      ViewDistance:
+        default: "Max view distance"
+      GameMode:
+        default: "The Minecraft game mode"
+      LevelType:
+        default: "Level type for world generation"
+      EnableRollingLogs:
+        default: "Whether to enable rolling logs"
+      Timezone:
+        default: "The server's timezone"
+
+Conditions:
+  MinecraftTypeTagProvided: !Not [ !Equals [ !Ref MinecraftTypeTag, '' ] ]
+  AdminPlayerNamesProvided: !Not [ !Equals [ !Ref AdminPlayerNames, '' ] ]
+  DifficultyProvided: !Not [ !Equals [ !Ref Difficulty, '' ] ]
+  WhitelistProvided: !Not [ !Equals [ !Ref Whitelist, '' ] ]
+  MinecraftVersionProvided: !Not [ !Equals [ !Ref MinecraftVersion, '' ] ]
+  EntryPointProvided: !Not [ !Equals [ !Join [ "", !Ref EntryPoint ], '' ] ]
+  CommandProvided: !Not [ !Equals [ !Join [ "", !Ref Command ], '' ] ]
+  LogGroupNameProvided: !Not [ !Equals [ !Ref LogGroupName, '' ] ]
+  LogStreamPrefixProvided:  !Not [ !Equals [ !Ref LogStreamPrefix, '' ] ]
+  KeyPairNameProvided: !Not [ !Equals [ !Ref KeyPairName, '' ] ]
+  IPv4AddressProvided: !Not [ !Equals [ !Ref YourIPv4, '' ] ]
+  IPv6AddressProvided: !Not [ !Equals [ !Ref YourIPv6, '' ] ]
+  DnsConfigEnabled: !And [ !Not [ !Equals [ !Ref HostedZoneId, '' ] ], !Not [ !Equals [ !Ref RecordName, '' ] ] ]
+  SpotPriceProvided: !Not [ !Equals [ !Ref SpotPrice, '' ] ]
+  MemoryProvided: !Not [ !Equals [ !Ref Memory, '' ] ]
+  SeedProvided: !Not [ !Equals [ !Ref Seed, '' ] ]
+  MaxPlayersProvided: !Not [ !Equals [ !Ref MaxPlayers, -1 ] ]
+  ViewDistanceProvided: !Not [ !Equals [ !Ref ViewDistance, -1 ] ]
+  GameModeProvided: !Not [ !Equals [ !Ref GameMode, '' ] ]
+  LevelTypeProvided: !Not [ !Equals [ !Ref LevelType, '' ] ]
+  EnableRollingLogsProvided: !Not [ !Equals [ !Ref EnableRollingLogs, '' ] ]
+  TimezoneProvided: !Not [ !Equals [ !Ref Timezone, '' ] ]
+
+
+Mappings:
+  ServerState:
+    Running:
+      DesiredCapacity: 1
+    Stopped:
+      DesiredCapacity: 0
+
+Resources:
+
+  # ====================================================
+  # BASIC VPC
+  # ====================================================
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.100.0.0/26
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+      - 0
+      - !GetAZs
+        Ref: 'AWS::Region'
+      CidrBlock: !Cidr [ 10.100.0.0/26, 4, 4 ]
+      VpcId: !Ref Vpc
+
+  SubnetARoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetA
+
+  SubnetBRoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetB
+
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+      - 1
+      - !GetAZs
+        Ref: 'AWS::Region'
+      CidrBlock: !Cidr [ 10.100.0.0/26, 4, 4 ]
+      VpcId: !Ref Vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: {}
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+
+  # ====================================================
+  # EFS FOR PERSISTENT DATA
+  # ====================================================
+
+  Efs:
+    Type: AWS::EFS::FileSystem
+    Properties: {}
+
+  MountA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref Efs
+      SecurityGroups:
+      - !Ref EfsSg
+      SubnetId: !Ref SubnetA
+
+  MountB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref Efs
+      SecurityGroups:
+      - !Ref EfsSg
+      SubnetId: !Ref SubnetB
+
+  EfsSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${AWS::StackName}-efs"
+      GroupDescription: !Sub "${AWS::StackName}-efs"
+      SecurityGroupIngress:
+      - FromPort: 2049
+        ToPort: 2049
+        IpProtocol: tcp
+        SourceSecurityGroupId: !Ref Ec2Sg
+      VpcId: !Ref Vpc
+
+  # ====================================================
+  # INSTANCE CONFIG
+  # ====================================================
+
+  Ec2Sg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${AWS::StackName}-ec2"
+      GroupDescription: !Sub "${AWS::StackName}-ec2"
+      SecurityGroupIngress:
+      - !If
+        - IPv4AddressProvided
+        - FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+          CidrIp: !Sub "${YourIPv4}/32"
+        - !Ref 'AWS::NoValue'
+      - !If
+        - IPv6AddressProvided
+        - FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+          CidrIpv6: !Sub "${YourIPv6}/128"
+        - !Ref 'AWS::NoValue'
+      - FromPort: 25565
+        ToPort: 25565
+        IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+      VpcId: !Ref Vpc
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref ECSAMI
+      InstanceType: !Ref InstanceType
+      KeyName:
+        !If [ KeyPairNameProvided, !Ref KeyPairName, !Ref 'AWS::NoValue' ]
+      SecurityGroups:
+      - !Ref Ec2Sg
+      SpotPrice: !If [ SpotPriceProvided, !Ref SpotPrice, !Ref 'AWS::NoValue' ]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          echo ECS_CLUSTER=${EcsCluster} >> /etc/ecs/ecs.config
+          yum install -y amazon-efs-utils
+          mkdir /opt/minecraft
+          mount -t efs ${Efs}:/ /opt/minecraft
+          chown 845:845 /opt/minecraft
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+    - MountA
+    - MountB
+    Properties:
+      AutoScalingGroupName: !Sub "${AWS::StackName}-asg"
+      DesiredCapacity: !FindInMap [ ServerState, !Ref ServerState, DesiredCapacity ]
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      NewInstancesProtectedFromScaleIn: true
+      MaxSize: 1
+      MinSize: 0
+      VPCZoneIdentifier:
+        - !Ref SubnetA
+        - !Ref SubnetB
+    Metadata:
+      LaunchEvent: !If [ DnsConfigEnabled, !GetAtt LaunchEvent.Arn, "" ]
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}-cluster"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: !Ref ContainerInsights
+
+  ECSCapacityProvider:
+    Type: AWS::ECS::CapacityProvider
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn: !Ref AutoScalingGroup
+        ManagedScaling:
+          MaximumScalingStepSize: 1
+          MinimumScalingStepSize: 1
+          Status: ENABLED
+          TargetCapacity: 100
+        ManagedTerminationProtection: ENABLED
+
+  EcsClusterCapacityProviderAssociation:
+    Type: AWS::ECS::ClusterCapacityProviderAssociations
+    Properties:
+      Cluster: !Ref EcsCluster
+      CapacityProviders:
+        - !Ref ECSCapacityProvider
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: !Ref ECSCapacityProvider
+          Weight: 1
+
+  EcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: !FindInMap [ ServerState, !Ref ServerState, DesiredCapacity ]
+      ServiceName: !Sub "${AWS::StackName}-ecs-service"
+      TaskDefinition: !Ref EcsTask
+      CapacityProviderStrategy:
+        - CapacityProvider: !Ref ECSCapacityProvider
+          Weight: 1
+          Base: 0
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+
+  EcsTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Volumes:
+      - Host:
+          SourcePath: /opt/minecraft
+        Name: minecraft
+      NetworkMode: "bridge"
+      ContainerDefinitions:
+        - Name: minecraft
+          MemoryReservation: 1024
+          Image: !Sub "itzg/minecraft-server:${MinecraftImageTag}"
+          EntryPoint: !If
+              - EntryPointProvided
+              - !Ref EntryPoint
+              - !Ref 'AWS::NoValue'
+          Command: !If
+              - CommandProvided
+              - !Ref Command
+              - !Ref 'AWS::NoValue'
+          PortMappings:
+          - ContainerPort: 25565
+            HostPort: 25565
+            Protocol: tcp
+          LogConfiguration:
+            !If
+            - LogGroupNameProvided
+            - LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref CloudWatchLogGroup
+                awslogs-stream-prefix: !If
+                - LogStreamPrefixProvided
+                - !Sub ${LogStreamPrefix}
+                - !Ref 'AWS::NoValue'
+                awslogs-region: !Ref AWS::Region
+                awslogs-create-group: true
+            - !Ref 'AWS::NoValue'
+          MountPoints:
+          - ContainerPath: /data
+            SourceVolume: minecraft
+            ReadOnly: false
+          Environment:
+            - Name: "EULA"
+              Value: "TRUE"
+            - !If
+              - MinecraftTypeTagProvided
+              - Name: "TYPE"
+                Value: !Sub "${MinecraftTypeTag}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - AdminPlayerNamesProvided
+              - Name: "OPS"
+                Value: !Sub "${AdminPlayerNames}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - DifficultyProvided
+              - Name: "DIFFICULTY"
+                Value: !Sub "${Difficulty}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - WhitelistProvided
+              - Name: "WHITELIST"
+                Value: !Sub "${Whitelist}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - MinecraftVersionProvided
+              - Name: "VERSION"
+                Value: !Sub "${MinecraftVersion}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - MemoryProvided
+              - Name: "MEMORY"
+                Value: !Sub "${Memory}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - SeedProvided
+              - Name: "SEED"
+                Value: !Sub "${Seed}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - MaxPlayersProvided
+              - Name: "MAX_PLAYERS"
+                Value: !Sub "${MaxPlayers}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - ViewDistanceProvided
+              - Name: "VIEW_DISTANCE"
+                Value: !Sub "${ViewDistance}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - GameModeProvided
+              - Name: "MODE"
+                Value: !Sub "${GameMode}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - LevelTypeProvided
+              - Name: "LEVEL_TYPE"
+                Value: !Sub "${LevelType}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - EnableRollingLogsProvided
+              - Name: "ENABLE_ROLLING_LOGS"
+                Value: !Sub "${EnableRollingLogs}"
+              - !Ref 'AWS::NoValue'
+            - !If
+              - TimezoneProvided
+              - Name: "TZ"
+                Value: !Sub "${Timezone}"
+              - !Ref 'AWS::NoValue'
+
+  CloudWatchLogGroup:
+    Condition: LogGroupNameProvided
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${LogGroupName}"
+      RetentionInDays: !Sub "${LogGroupRetentionInDays}"
+
+  # ====================================================
+  # SET DNS RECORD
+  # ====================================================
+
+  SetDNSRecordLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: DnsConfigEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "route53:ChangeResourceRecordSets"
+                Resource: !Sub "arn:aws:route53:::hostedzone/${HostedZoneId}"
+              - Effect: "Allow"
+                Action: "ec2:DescribeInstance*"
+                Resource: "*"
+
+  SetDNSRecordLambda:
+    Type: "AWS::Lambda::Function"
+    Condition: DnsConfigEnabled
+    Properties:
+      Environment:
+        Variables:
+          HostedZoneId: !Ref HostedZoneId
+          RecordName: !Ref RecordName
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+          def handler(event, context):
+            new_instance = boto3.resource('ec2').Instance(event['detail']['EC2InstanceId'])
+            boto3.client('route53').change_resource_record_sets(
+              HostedZoneId= os.environ['HostedZoneId'],
+              ChangeBatch={
+                  'Comment': 'updating',
+                  'Changes': [
+                      {
+                          'Action': 'UPSERT',
+                          'ResourceRecordSet': {
+                              'Name': os.environ['RecordName'],
+                              'Type': 'A',
+                              'TTL': 60,
+                              'ResourceRecords': [
+                                  {
+                                      'Value': new_instance.public_ip_address
+                                  },
+                              ]
+                          }
+                      },
+                  ]
+              })
+      Description: Sets Route 53 DNS Record for Minecraft
+      FunctionName: !Sub "${AWS::StackName}-set-dns"
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt SetDNSRecordLambdaRole.Arn
+      Runtime: python3.7
+      Timeout: 20
+
+  LaunchEvent:
+    Type: AWS::Events::Rule
+    Condition: DnsConfigEnabled
+    Properties:
+      EventPattern:
+        source:
+        - aws.autoscaling
+        detail-type:
+        - EC2 Instance Launch Successful
+        detail:
+          AutoScalingGroupName:
+          - !Sub "${AWS::StackName}-asg"
+      Name: !Sub "${AWS::StackName}-instance-launch"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SetDNSRecordLambda.Arn
+          Id: !Sub "${AWS::StackName}-set-dns"
+
+  LaunchEventLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: DnsConfigEnabled
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt SetDNSRecordLambda.Arn
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LaunchEvent.Arn
+
+Outputs:
+  CheckInstanceIp:
+    Description: To find your Minecraft instance IP address, visit the following link. Click on the instance to find its Public IP address.
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/ec2/v2/home?region=${AWS::Region}#Instances:tag:aws:autoscaling:groupName=${AutoScalingGroup};sort=tag:Name"
