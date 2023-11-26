@@ -76,13 +76,19 @@
 
 ### Prerequisites
 
-Cloudformation 2 Terraform requires python >= 3.7
+Cloudformation 2 Terraform requires python >= 3.8
 
 ### Installation
 
 cf2tf is available as an easy to install pip package.
 ```sh
 pip install cf2tf
+```
+
+If you are a [Homebrew](https://brew.sh/) user, can you install via brew:
+
+```
+$ brew install cf2tf
 ```
 
 ## Usage
@@ -119,13 +125,13 @@ Contributions are what make the open-source community such an amazing place to l
 
 
 
-This project uses poetry to manage dependencies and pre-commit to run formatting, linting and tests. You will need to have both installed to your system as well as python 3.9.
+This project uses poetry to manage dependencies and pre-commit to run formatting, linting and tests. You will need to have both installed to your system as well as python 3.11.
 
 1. Fork the Project
-2. Setup the environment.  
+2. Setup the environment.
    This project uses vscode devcontainer to provide a completly configured development environment. If you are using vscode and have the remote container extension installed, you should be asked to use the devcontainer when you open this project inside of vscode.
 
-   If you are not using devcontainers then you will need to have python installed. Install the `poetry`, `nox`, `nox_poetry` and `pre-commit` packages. Then run `poetry install` and `pre-commit install` commands. 
+   If you are not using devcontainers then you will need to have python installed. Install the `poetry`, `nox`, `nox_poetry` and `pre-commit` packages. Then run `poetry install` and `pre-commit install` commands.
 
    Most of the steps can be found in the [Dockerfile](.devcontainer/Dockerfile).
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)

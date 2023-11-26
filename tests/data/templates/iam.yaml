@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Creates an IAM policy"
+
+Conditions:
+  RetainBucket: !Equals [ "TRUE", "TRUE" ]
+
+Resources:
+
+  TestPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: TestPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - !If
+            - RetainBucket
+            - Effect: Allow
+              Action:
+                - s3:*
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  s3:x-amz-acl: "bucket-owner-full-control"
+            - !Ref "AWS::NoValue"

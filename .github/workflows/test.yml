@@ -12,15 +12,15 @@ on:
 jobs:
   single:
     runs-on: ubuntu-latest
-    name: Python 3.9
+    name: Python 3.11
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Latest Python
-        uses: actions/setup-python@v4.7.0
+        uses: actions/setup-python@v4.7.1
         with:
-          python-version: 3.9
+          python-version: 3.11
           architecture: x64
 
       - name: Setup Poetry
@@ -32,10 +32,10 @@ jobs:
         run: pip install nox nox_poetry coverage[toml]
 
       - name: Run Tests
-        run: nox -s tests -p 3.9
+        run: nox -s tests -p 3.11
 
       - name: Combine Coverage reports
-        run: nox -s coverage -p 3.9
+        run: nox -s coverage -p 3.11
 
       - name: Convert Coverage
         run: coverage xml --fail-under=0
@@ -52,14 +52,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.10"] # 3.9 is done in the job above
+        python-version: ["3.8", "3.9", "3.10", "3.12"] # 3.11 is done in the job above
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4.7.0
+        uses: actions/setup-python@v4.7.1
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64

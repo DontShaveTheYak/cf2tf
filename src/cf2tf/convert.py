@@ -10,12 +10,17 @@ from thefuzz import process  # type: ignore
 import cf2tf.conversion.expressions as functions
 import cf2tf.terraform._configuration as config
 import cf2tf.terraform.doc_file as doc_file
-from cf2tf.conversion.overrides import OVERRIDE_DISPATCH, GLOBAL_OVERRIDES
+from cf2tf.conversion.overrides import GLOBAL_OVERRIDES, OVERRIDE_DISPATCH
 from cf2tf.terraform.blocks import Block, Locals, Output, Resource, Variable
 from cf2tf.terraform.hcl2 import AllTypes
 from cf2tf.terraform.hcl2.complex import ListType, MapType
 from cf2tf.terraform.hcl2.custom import CommentType, LiteralType
-from cf2tf.terraform.hcl2.primitive import NumberType, StringType, TerraformType
+from cf2tf.terraform.hcl2.primitive import (
+    BooleanType,
+    NumberType,
+    StringType,
+    TerraformType,
+)
 
 if TYPE_CHECKING:
     from cf2tf.terraform.code import SearchManager
@@ -145,7 +150,6 @@ class TemplateConverter:
         data: Any,
         allowed_func: functions.Dispatch,
         prev_func: Optional[str] = None,
-        inside_function=False,
     ):
         """Recurses through a Cloudformation template. Solving all
         references and variables along the way.
@@ -166,11 +170,33 @@ class TemplateConverter:
                 if key == "Ref":
                     return functions.ref(self, value)
 
-                if "Fn::" not in key and not (
-                    key == "Condition" and inside_function is True
-                ):
+                # This takes care of keys that not intrinsic functions,
+                #  except for the condition func
+                if "Fn::" not in key and key != "Condition":
                     data[key] = self.resolve_values(
-                        value, allowed_func, prev_func, inside_function=inside_function
+                        value,
+                        allowed_func,
+                    )
+                    continue
+
+                # Takes care of the tricky 'Condition' key
+                if key == "Condition":
+                    # The real fix is to not resolve every key/value in the entire
+                    # cloudformation template. We should only attempt to resolve what is needed,
+                    # like outputs and resource properties.
+                    # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference.html
+
+                    if "Properties" in data or "Value" in data:
+                        continue
+
+                    # If it's an intrinsic func
+                    if is_condition_func(value):
+                        return functions.condition(self, value)
+
+                    # Normal key like in an IAM role
+                    data[key] = self.resolve_values(
+                        value,
+                        allowed_func,
                     )
                     continue
 
@@ -178,7 +204,7 @@ class TemplateConverter:
                     raise ValueError(f"{key} not allowed to be nested in {prev_func}.")
 
                 value = self.resolve_values(
-                    value, functions.ALLOWED_FUNCTIONS[key], key, inside_function=True
+                    value, functions.ALLOWED_FUNCTIONS[key], key
                 )
 
                 try:
@@ -189,13 +215,12 @@ class TemplateConverter:
             return MapType(data)
         elif isinstance(data, list):
             resolved_list_values = [
-                self.resolve_values(
-                    item, allowed_func, prev_func, inside_function=inside_function
-                )
-                for item in data
+                self.resolve_values(item, allowed_func, prev_func) for item in data
             ]
 
             return ListType(resolved_list_values)
+        elif isinstance(data, bool):
+            return BooleanType(data)
         elif isinstance(data, str):
             return StringType(data)
         elif isinstance(data, (int, float)):
@@ -622,3 +647,21 @@ def perform_global_overrides(
             params = override(tc, params)
 
     return params
+
+
+# All the other Cloudformation intrinsic functions start with `Fn:` but for some reason
+# the Condition function does not. This can be problem because
+#  `Condition` is a valid key in an IAM policy but its value is always a Map.
+def is_condition_func(value: Any) -> bool:
+    """Checks if the 'Condition' key is a instrinsic function.
+
+    Args:
+        value (Any): The value of the 'Condition' key.
+
+    Returns:
+        bool: True if we think this `Condition` key is an instrinsic function.
+    """
+    if isinstance(value, str):
+        return True
+
+    return False
