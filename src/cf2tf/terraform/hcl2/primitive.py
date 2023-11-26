@@ -1,4 +1,4 @@
-from abc import abstractclassmethod
+from abc import abstractmethod
 from typing import Any, Union
 
 try:
@@ -21,7 +21,8 @@ class TerraformType(Protocol):
     def __str__(self) -> str:
         return self.render(0)
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def render(self, indent: int) -> str:
         raise NotImplementedError
 
