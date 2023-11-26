@@ -1,0 +1,2496 @@
+Description: "Conversions API Gateway on EKS - Multiaccount - v1.11.0 | Deleting this stack removes all Conversions API Gateway resources automatically. "
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Conversions API Gateway Configuration
+        Parameters:
+          - ProvisioningData
+          - SystemHealthInformation
+          - CustomImageIds
+Parameters:
+  ProvisioningData:
+    Type: String
+    Default: MA-DO-NOT-EDIT
+    Description: DO NOT EDIT! Provisioning data for setting up your Conversions API Gateway. This field should already be populated.
+    MinLength: 1
+  SystemHealthInformation:
+    Type: String
+    AllowedValues:
+      - "Yes"
+      - "No"
+    Description: Would you like to periodically send data about the Conversions API Gateway installation to Meta? This data will be used to monitor the effect of each released version and provide support personnel with additional context when troubleshooting problems.
+Mappings:
+  CustomImageIds:
+    af-south-1:
+      ami: ami-0560a3fde1f4658a1
+    ap-northeast-1:
+      ami: ami-0befc222b5788c058
+    ap-northeast-2:
+      ami: ami-0526abfc603ef089a
+    ap-south-1:
+      ami: ami-0631298c98a13839d
+    ap-southeast-1:
+      ami: ami-0483822f0016e2328
+    ap-southeast-2:
+      ami: ami-094d12e9dce12fd56
+    ca-central-1:
+      ami: ami-0eee20d5f863a8bee
+    eu-central-1:
+      ami: ami-07169027ca2613f84
+    eu-north-1:
+      ami: ami-091cf1446d76780ce
+    eu-south-1:
+      ami: ami-0f2b8c580d21a0e6d
+    eu-west-1:
+      ami: ami-0ea4482f5f8fbf6af
+    eu-west-2:
+      ami: ami-07a1a9fbda0c5eabc
+    eu-west-3:
+      ami: ami-0c9a4db422b6e9265
+    me-south-1:
+      ami: ami-04a3c2f441fecce75
+    sa-east-1:
+      ami: ami-0694036ee5e31e45d
+    us-east-1:
+      ami: ami-0966519948fa03b76
+    us-east-2:
+      ami: ami-0a093bbdd2f2c6a6d
+    us-west-1:
+      ami: ami-0799f6a72ab124ccf
+    us-west-2:
+      ami: ami-06aa9f08bc742014c
+Resources:
+  CustomVPCB98CB5C5:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.31.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC
+  CustomVPCInternetGateway5B787B77:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+  CustomVPCInternetGatewayAttachment4DE4D032:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: CustomVPCInternetGateway5B787B77
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  CustomVPCIPv6CidrBlock2844DCD4:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  CustomVPCEgressOnlyInternetGateway635B9DCC:
+    Type: AWS::EC2::EgressOnlyInternetGateway
+    Properties:
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  CustomVPCPublic039347A47:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs:
+              Ref: AWS::Region
+      CidrBlock:
+        Fn::Select:
+          - 0
+          - Fn::Cidr:
+              - 172.31.0.0/16
+              - 4
+              - "12"
+      Ipv6CidrBlock:
+        Fn::Select:
+          - 0
+          - Fn::Cidr:
+              - Fn::Select:
+                  - 0
+                  - Fn::GetAtt:
+                      - CustomVPCB98CB5C5
+                      - Ipv6CidrBlocks
+              - 4
+              - "64"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ0/Public
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+    DependsOn:
+      - CustomVPCIPv6CidrBlock2844DCD4
+  CustomVPCPublic0RouteTableC4A2F788:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ0/Public/RouteTable
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  CustomVPCPublic0RouteTableAssociationCD395678:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: CustomVPCPublic0RouteTableC4A2F788
+      SubnetId:
+        Ref: CustomVPCPublic039347A47
+  CustomVPCPublic0DefaultRoute34086041:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: CustomVPCInternetGateway5B787B77
+      RouteTableId:
+        Ref: CustomVPCPublic0RouteTableC4A2F788
+    DependsOn:
+      - CustomVPCInternetGatewayAttachment4DE4D032
+  CustomVPCPublic0DefaultIPv6Route78451BE4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      GatewayId:
+        Ref: CustomVPCInternetGateway5B787B77
+      RouteTableId:
+        Ref: CustomVPCPublic0RouteTableC4A2F788
+    DependsOn:
+      - CustomVPCInternetGatewayAttachment4DE4D032
+  CustomVPCPublic0EIP7301E2D0:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ0/Public/EIP
+  CustomVPCPublic0NatGateway771F3234:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - CustomVPCPublic0EIP7301E2D0
+          - AllocationId
+      SubnetId:
+        Ref: CustomVPCPublic039347A47
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ0/Public/NatGateway
+  CustomVPCPrivate0D2251CEA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs:
+              Ref: AWS::Region
+      CidrBlock:
+        Fn::Select:
+          - 1
+          - Fn::Cidr:
+              - 172.31.0.0/16
+              - 4
+              - "12"
+      Ipv6CidrBlock:
+        Fn::Select:
+          - 1
+          - Fn::Cidr:
+              - Fn::Select:
+                  - 0
+                  - Fn::GetAtt:
+                      - CustomVPCB98CB5C5
+                      - Ipv6CidrBlocks
+              - 4
+              - "64"
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ0/Private
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+    DependsOn:
+      - CustomVPCIPv6CidrBlock2844DCD4
+  CustomVPCPrivate0RouteTable409F685C:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ0/Private/RouteTable
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  CustomVPCPrivate0RouteTableAssociation1429B372:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: CustomVPCPrivate0RouteTable409F685C
+      SubnetId:
+        Ref: CustomVPCPrivate0D2251CEA
+  CustomVPCPrivate0DefaultNatRoute647FD84E:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: CustomVPCPublic0NatGateway771F3234
+      RouteTableId:
+        Ref: CustomVPCPrivate0RouteTable409F685C
+  CustomVPCPrivate0DefaultEgressOnlyRoute0CBB8974:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      EgressOnlyInternetGatewayId:
+        Ref: CustomVPCEgressOnlyInternetGateway635B9DCC
+      RouteTableId:
+        Ref: CustomVPCPrivate0RouteTable409F685C
+  CustomVPCPublic1E2BA9DAA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs:
+              Ref: AWS::Region
+      CidrBlock:
+        Fn::Select:
+          - 2
+          - Fn::Cidr:
+              - 172.31.0.0/16
+              - 4
+              - "12"
+      Ipv6CidrBlock:
+        Fn::Select:
+          - 2
+          - Fn::Cidr:
+              - Fn::Select:
+                  - 0
+                  - Fn::GetAtt:
+                      - CustomVPCB98CB5C5
+                      - Ipv6CidrBlocks
+              - 4
+              - "64"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ1/Public
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+    DependsOn:
+      - CustomVPCIPv6CidrBlock2844DCD4
+  CustomVPCPublic1RouteTable36124A34:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ1/Public/RouteTable
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  CustomVPCPublic1RouteTableAssociation4B85F0F6:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: CustomVPCPublic1RouteTable36124A34
+      SubnetId:
+        Ref: CustomVPCPublic1E2BA9DAA
+  CustomVPCPublic1DefaultRoute4B970118:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: CustomVPCInternetGateway5B787B77
+      RouteTableId:
+        Ref: CustomVPCPublic1RouteTable36124A34
+    DependsOn:
+      - CustomVPCInternetGatewayAttachment4DE4D032
+  CustomVPCPublic1DefaultIPv6RouteA602F963:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      GatewayId:
+        Ref: CustomVPCInternetGateway5B787B77
+      RouteTableId:
+        Ref: CustomVPCPublic1RouteTable36124A34
+    DependsOn:
+      - CustomVPCInternetGatewayAttachment4DE4D032
+  CustomVPCPublic1EIP7EE4A9AE:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ1/Public/EIP
+  CustomVPCPublic1NatGateway0E4E03E7:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - CustomVPCPublic1EIP7EE4A9AE
+          - AllocationId
+      SubnetId:
+        Ref: CustomVPCPublic1E2BA9DAA
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ1/Public/NatGateway
+  CustomVPCPrivate1BE7181BD:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs:
+              Ref: AWS::Region
+      CidrBlock:
+        Fn::Select:
+          - 3
+          - Fn::Cidr:
+              - 172.31.0.0/16
+              - 4
+              - "12"
+      Ipv6CidrBlock:
+        Fn::Select:
+          - 3
+          - Fn::Cidr:
+              - Fn::Select:
+                  - 0
+                  - Fn::GetAtt:
+                      - CustomVPCB98CB5C5
+                      - Ipv6CidrBlocks
+              - 4
+              - "64"
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ1/Private
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+    DependsOn:
+      - CustomVPCIPv6CidrBlock2844DCD4
+  CustomVPCPrivate1RouteTable9ACE58A9:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+        - Key: Name
+          Value:
+            Fn::Join:
+              - /
+              - - Ref: AWS::StackName
+                - VPC/AZ1/Private/RouteTable
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  CustomVPCPrivate1RouteTableAssociation2A40B82E:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: CustomVPCPrivate1RouteTable9ACE58A9
+      SubnetId:
+        Ref: CustomVPCPrivate1BE7181BD
+  CustomVPCPrivate1DefaultNatRoute1E916812:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: CustomVPCPublic1NatGateway0E4E03E7
+      RouteTableId:
+        Ref: CustomVPCPrivate1RouteTable9ACE58A9
+  CustomVPCPrivate1DefaultEgressOnlyRoute6E190E56:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      EgressOnlyInternetGatewayId:
+        Ref: CustomVPCEgressOnlyInternetGateway635B9DCC
+      RouteTableId:
+        Ref: CustomVPCPrivate1RouteTable9ACE58A9
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+  ConversionsApiGatewayBastionIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:CreateInstanceProfile
+                  - iam:DeleteInstanceProfile
+                  - iam:GetInstanceProfile
+                  - iam:RemoveRoleFromInstanceProfile
+                  - iam:GetRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:AttachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:ListInstanceProfiles
+                  - iam:AddRoleToInstanceProfile
+                  - iam:ListInstanceProfilesForRole
+                  - iam:PassRole
+                  - iam:DetachRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:GetOpenIDConnectProvider
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:DeleteOpenIDConnectProvider
+                  - iam:TagOpenIDConnectProvider
+                  - iam:ListAttachedRolePolicies
+                  - iam:TagRole
+                  - iam:GetPolicy
+                  - iam:CreatePolicy
+                  - iam:DeletePolicy
+                  - iam:ListPolicyVersions
+                Resource:
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:iam::"
+                        - Ref: AWS::AccountId
+                        - :instance-profile/eksctl-*
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:iam::"
+                        - Ref: AWS::AccountId
+                        - :role/eksctl-
+                        - Fn::Select:
+                            - 4
+                            - Fn::Split:
+                                - "-"
+                                - Fn::Select:
+                                    - 2
+                                    - Fn::Split:
+                                        - /
+                                        - Ref: AWS::StackId
+                        - -*
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:iam::"
+                        - Ref: AWS::AccountId
+                        - :policy/eksctl-*
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:iam::"
+                        - Ref: AWS::AccountId
+                        - :oidc-provider/*
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:iam::"
+                        - Ref: AWS::AccountId
+                        - :role/aws-service-role/eks-nodegroup.amazonaws.com/AWSServiceRoleForAmazonEKSNodegroup
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:iam::"
+                        - Ref: AWS::AccountId
+                        - :role/eksctl-managed-*
+              - Effect: Allow
+                Action:
+                  - iam:GetRole
+                Resource:
+                  - arn:aws:iam::*:role/*
+              - Effect: Allow
+                Action:
+                  - iam:CreateServiceLinkedRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    iam:AWSServiceName:
+                      - eks.amazonaws.com
+                      - eks-nodegroup.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+          PolicyName: IAMPolicy
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:describe*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ec2:CreateInternetGateway
+                  - ec2:CreateVPC
+                  - ec2:AllocateAddress
+                  - ec2:CreateTags
+                  - ec2:CreateSecurityGroup
+                  - ec2:CreateSubnet
+                  - ec2:CreateRouteTable
+                  - ec2:CreateNatGateway
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:CreateLaunchTemplate
+                  - ec2:RunInstances
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ec2:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/alpha.eksctl.io/cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Effect: Allow
+                Action:
+                  - ec2:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/aws:eks:cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Effect: Allow
+                Action:
+                  - ec2:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/eks:cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Effect: Allow
+                Action:
+                  - ec2:DeleteLaunchTemplate
+                Resource: arn:*:ec2:*:*:launch-template/*
+          PolicyName: Ec2Policy
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - eks:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/alpha.eksctl.io/cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Effect: Allow
+                Action:
+                  - eks:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/eks:cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Effect: Allow
+                Action:
+                  - eks:*
+                Resource: "*"
+                Condition:
+                  StringLike:
+                    aws:ResourceTag/Name:
+                      Fn::Join:
+                        - ""
+                        - - Fn::Select:
+                              - 4
+                              - Fn::Split:
+                                  - "-"
+                                  - Fn::Select:
+                                      - 2
+                                      - Fn::Split:
+                                          - /
+                                          - Ref: AWS::StackId
+                          - "*"
+              - Effect: Allow
+                Action:
+                  - eks:describe*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - eks:list*
+                Resource: "*"
+          PolicyName: EKSPolicy
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource:
+                  Fn::Join:
+                    - ""
+                    - - arn:aws:logs:*:*:log-group:/aws/eks/
+                      - Fn::Select:
+                          - 4
+                          - Fn::Split:
+                              - "-"
+                              - Fn::Select:
+                                  - 2
+                                  - Fn::Split:
+                                      - /
+                                      - Ref: AWS::StackId
+                      - /*:*
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: arn:aws:logs:*:*:log-group:ConversionsAPIGateway/*
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/alpha.eksctl.io/cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Effect: Allow
+                Action:
+                  - autoscaling:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/alpha.eksctl.io/cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Effect: Allow
+                Action:
+                  - autoscaling:Set*
+                Resource: arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/*
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudformation:Describe*
+                  - cloudformation:List*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/alpha.eksctl.io/cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+              - Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - arn:aws:ssm:*:*:parameter/aws/*
+                  - arn:aws:ssm:*::parameter/aws/*
+                Effect: Allow
+              - Action:
+                  - kms:CreateGrant
+                  - kms:DescribeKey
+                Resource: "*"
+                Effect: Allow
+          PolicyName: MiscPolicy
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:DescribeLoadBalancers
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/elbv2.k8s.aws/cluster:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+          PolicyName: ELBPolicy
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - acm:ImportCertificate
+                  - acm:AddTagsToCertificate
+                Resource:
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:acm:"
+                        - Ref: AWS::Region
+                        - ":"
+                        - Ref: AWS::AccountId
+                        - :certificate/*
+          PolicyName: BastionACMPolicy
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+  ALBWaitConditionHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+  ALBWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    Properties:
+      Count: 1
+      Handle:
+        Ref: ALBWaitConditionHandle
+      Timeout: "7200"
+    DependsOn:
+      - EKSBastionASG
+  BastionWaitConditionHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+  BastionWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    Properties:
+      Count: 1
+      Handle:
+        Ref: BastionWaitConditionHandle
+      Timeout: "3600"
+    DependsOn:
+      - EKSBastionASG
+  SelfSignedCertWaitConditionHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+  SelfSignedCertWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    Properties:
+      Count: 1
+      Handle:
+        Ref: SelfSignedCertWaitConditionHandle
+      Timeout: "7200"
+  ConversionsApiGatewayBastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName:
+        Fn::Join:
+          - "-"
+          - - ConversionsApiGatewayBastionInstanceProfile
+            - Ref: AWS::Region
+            - Fn::Select:
+                - 4
+                - Fn::Split:
+                    - "-"
+                    - Fn::Select:
+                        - 2
+                        - Fn::Split:
+                            - /
+                            - Ref: AWS::StackId
+            - Fn::Select:
+                - 0
+                - Fn::Split:
+                    - "-"
+                    - Fn::Select:
+                        - 2
+                        - Fn::Split:
+                            - /
+                            - Ref: AWS::StackId
+      Roles:
+        - Ref: ConversionsApiGatewayBastionIamRole
+  EKSBastionNoAccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EKSBastionSecurityGroup to limit access to the instance
+      GroupName:
+        Fn::Join:
+          - ""
+          - - CAPIGNoAccess
+            - Fn::Select:
+                - 4
+                - Fn::Split:
+                    - "-"
+                    - Fn::Select:
+                        - 2
+                        - Fn::Split:
+                            - /
+                            - Ref: AWS::StackId
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+      VpcId:
+        Ref: CustomVPCB98CB5C5
+  EKSBastionLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Arn:
+            Fn::GetAtt:
+              - ConversionsApiGatewayBastionInstanceProfile
+              - Arn
+        ImageId:
+          Fn::FindInMap:
+            - CustomImageIds
+            - Ref: AWS::Region
+            - ami
+        InstanceType:
+          Fn::If:
+            - useT3Nano
+            - t3.nano
+            - t2.micro
+        SecurityGroupIds:
+          - Ref: EKSBastionNoAccessSecurityGroup
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value:
+                  Fn::Join:
+                    - ""
+                    - - Fn::Select:
+                          - 4
+                          - Fn::Split:
+                              - "-"
+                              - Fn::Select:
+                                  - 2
+                                  - Fn::Split:
+                                      - /
+                                      - Ref: AWS::StackId
+                      - -EKSBastion
+              - Key: MainStack
+                Value:
+                  Ref: AWS::StackName
+        UserData:
+          Fn::Base64:
+            Fn::Sub:
+              - |-
+                #!/bin/bash
+                # shellcheck disable=SC2016
+                # shellcheck disable=SC2154
+                # This script is imported to CDK app.py file and populated with variables so it can't use double quote
+                # Single curly brackets are build time parameters; double curly brackets are runtime parameters.
+
+                rpm -Uvh https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
+                /opt/aws/bin/cfn-init -v --stack '${AWS::StackId}' --resource EKSBastionLaunchTemplate --region '${AWS::Region}' --configsets default
+                wget 'https://conversions-api-gateway-release-production.s3.amazonaws.com/conversions-api-gateway-1.11.0-eks.run' -O /root/cloudbridge_release
+                chmod +x /root/cloudbridge_release
+                /root/cloudbridge_release --target /opt/cloudbridge -- --placeholder  --template_name 'multi_tenant' \
+                --image_tag 'multitenant' --release_version '1.11.0' --release_bucket 'conversions-api-gateway-release-production' \
+                --admin_email '${AdminEmail}' --admin_password '${AdminPassword}' --provisioning_data '${ProvisioningData}' \
+                --telemetry_consent '${SystemHealthInformation}' \
+                --eks_cluster_name '${EksClusterName}' --aws_region '${AWS::Region}' --aws_instance_type 'm5.large' --main_stack_name '${AWS::StackName}' \
+                --instance_max_size 1 \
+                --instance_min_size 1 \
+                --bastion_wait_condition_url '${BastionWaitConditionURL}' \
+                --alb_wait_condition_url '${ALBWaitConditionURL}' --self_signed_cert_wait_condition_url '${SelfSignedCertWaitConditionURL}' \
+                --capig_s3_bucket_name '${CapigS3BucketName}' \
+                --release_channel 'production' --instance_id '${InstanceId}'
+              - EksClusterName:
+                  Fn::Select:
+                    - 4
+                    - Fn::Split:
+                        - "-"
+                        - Fn::Select:
+                            - 2
+                            - Fn::Split:
+                                - /
+                                - Ref: AWS::StackId
+                InstanceId:
+                  Fn::Join:
+                    - ""
+                    - - prod-
+                      - Fn::Select:
+                          - 2
+                          - Fn::Split:
+                              - /
+                              - Ref: AWS::StackId
+                ALBWaitConditionURL:
+                  Ref: ALBWaitConditionHandle
+                SelfSignedCertWaitConditionURL:
+                  Ref: SelfSignedCertWaitConditionHandle
+                BastionWaitConditionURL:
+                  Ref: BastionWaitConditionHandle
+                CapigS3BucketName:
+                  Ref: S3Bucket
+                EnableEventEnrichment: "No"
+                AdminEmail:
+                  Fn::GetAtt:
+                    - ConversionsApiGatewayBastionIamRole
+                    - Arn
+                AdminPassword:
+                  Fn::GetAtt:
+                    - ConversionsApiGatewayBastionIamRole
+                    - RoleId
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          default:
+            - 01_setupCfnHup
+            - 02_config-amazon-cloudwatch-agent
+            - 03_restart_amazon-cloudwatch-agent
+          UpdateEnvironment:
+            - 02_config-amazon-cloudwatch-agent
+            - 03_restart_amazon-cloudwatch-agent
+        02_config-amazon-cloudwatch-agent:
+          files:
+            /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json:
+              content:
+                Fn::Sub: '{"agent":{"run_as_user":"root"},"logs":{"logs_collected":{"files":{"collect_list":[{"file_path":"/var/log/cloud-init-output.log","log_group_name":"ConversionsAPIGateway/cloud-init-output.log","log_stream_name":"{instance_id}","retention_in_days":14}]}}}}'
+        03_restart_amazon-cloudwatch-agent:
+          commands:
+            01_stop_service:
+              command: /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a stop
+            02_start_service:
+              command: /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+        01_setupCfnHup:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content:
+                Fn::Sub: |-
+                  [main]
+                  stack=${AWS::StackId}
+                  region=${AWS::Region}
+                  interval=1
+              mode: "000400"
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/amazon-cloudwatch-agent-auto-reloader.conf:
+              content:
+                Fn::Sub: |-
+                  [cfn-auto-reloader-hook]
+                  triggers=post.update
+                  path=Resources.EC2Instance.Metadata.AWS::CloudFormation::Init.02_config-amazon-cloudwatch-agent
+                  action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource EKSBastionInstance --region ${AWS::Region} --configsets UpdateEnvironment
+                  runas=root
+              mode: "000400"
+              owner: root
+              group: root
+            /lib/systemd/system/cfn-hup.service:
+              content: |-
+                [Unit]
+                Description=cfn-hup daemon
+                [Service]
+                Type=simple
+                ExecStart=/opt/aws/bin/cfn-hup
+                Restart=always
+                [Install]
+                WantedBy=multi-user.target
+            /etc/vpc.json:
+              content:
+                Fn::Sub:
+                  - |
+                    {
+                    	"vpcid":"${vpcid}",
+                    	"available_zones": ["${zone0}", "${zone1}"],
+                    	"public_subnets": ["${public0}", "${public1}"],
+                    	"private_subnets": ["${private0}", "${private1}"]
+                    }
+                  - vpcid:
+                      Ref: CustomVPCB98CB5C5
+                    zone0:
+                      Fn::Select:
+                        - 0
+                        - Fn::GetAZs:
+                            Ref: AWS::Region
+                    zone1:
+                      Fn::Select:
+                        - 1
+                        - Fn::GetAZs:
+                            Ref: AWS::Region
+                    public0:
+                      Ref: CustomVPCPublic039347A47
+                    public1:
+                      Ref: CustomVPCPublic1E2BA9DAA
+                    private0:
+                      Ref: CustomVPCPrivate0D2251CEA
+                    private1:
+                      Ref: CustomVPCPrivate1BE7181BD
+            /opt/cloudbridge/var/cluster_type:
+              content: awseks
+            /opt/cloudbridge/var/cb_product_name:
+              content: Conversions API Gateway
+            /opt/cloudbridge/var/cb_tenant_type:
+              content: multitenant
+          commands:
+            01enable_cfn_hup:
+              command: systemctl enable cfn-hup.service
+            02start_cfn_hup:
+              command: systemctl start cfn-hup.service
+  EKSBastionASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName:
+        Fn::Join:
+          - ""
+          - - Fn::Select:
+                - 4
+                - Fn::Split:
+                    - "-"
+                    - Fn::Select:
+                        - 2
+                        - Fn::Split:
+                            - /
+                            - Ref: AWS::StackId
+            - -EKSBastionASG
+      LaunchTemplate:
+        LaunchTemplateId:
+          Ref: EKSBastionLaunchTemplate
+        Version:
+          Fn::GetAtt:
+            - EKSBastionLaunchTemplate
+            - LatestVersionNumber
+      MaxSize: "1"
+      MinSize: "1"
+      Tags:
+        - Key: alpha.eksctl.io/cluster-name
+          PropagateAtLaunch: true
+          Value:
+            Fn::Select:
+              - 4
+              - Fn::Split:
+                  - "-"
+                  - Fn::Select:
+                      - 2
+                      - Fn::Split:
+                          - /
+                          - Ref: AWS::StackId
+        - Key: Application
+          PropagateAtLaunch: true
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          PropagateAtLaunch: true
+          Value: ""
+        - Key: InstanceId
+          PropagateAtLaunch: true
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          PropagateAtLaunch: true
+          Value:
+            Ref: AWS::StackName
+      VPCZoneIdentifier:
+        - Ref: CustomVPCPublic039347A47
+        - Ref: CustomVPCPublic1E2BA9DAA
+    DependsOn:
+      - ConversionsApiGatewayUninstallLambdaRole
+      - CustomVPCInternetGatewayAttachment4DE4D032
+  ConversionsApiGatewayUninstallLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:SendCommand
+                Resource:
+                  - arn:aws:ssm:*:*:document/*
+              - Effect: Allow
+                Action:
+                  - ssm:SendCommand
+                Resource:
+                  - "*"
+                Condition:
+                  StringEquals:
+                    ssm:resourceTag/Name:
+                      - Fn::Join:
+                          - ""
+                          - - Fn::Select:
+                                - 4
+                                - Fn::Split:
+                                    - "-"
+                                    - Fn::Select:
+                                        - 2
+                                        - Fn::Split:
+                                            - /
+                                            - Ref: AWS::StackId
+                            - -EKSBastion
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - ec2:DescribeTags
+                Resource:
+                  - "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:log-group:/aws/lambda/*:*
+              - Effect: Allow
+                Action:
+                  - acm:DeleteCertificate
+                Resource:
+                  - arn:aws:acm:*:*:certificate/*
+              - Effect: Allow
+                Action:
+                  - eks:DescribeCluster
+                Resource:
+                  - "*"
+              - Effect: Allow
+                Action:
+                  - ec2:*
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/alpha.eksctl.io/cluster-name:
+                      Fn::Select:
+                        - 4
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 2
+                                - Fn::Split:
+                                    - /
+                                    - Ref: AWS::StackId
+          PolicyName: LambdaPolicy
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+  CAPIGUninstallLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: |-
+          import logging
+          import os
+          import time
+
+          import boto3
+          import cfnresponse
+
+
+          def handler(event, context):
+              logger = logging.getLogger()
+              logger.setLevel(logging.INFO)
+
+              logger.info(event)
+              ssm = boto3.client("ssm")
+              ec2 = boto3.client("ec2")
+              eks = boto3.client('eks')
+              acm = boto3.client('acm')
+              responseData = {}
+              region = os.environ["AWS_REGION"]
+              self_signed_cert_arn = os.environ["SELF_SIGNED_CERT_ARN"]
+              # For Non Delete requests, immediately send a SUCCESS response.
+              if event["RequestType"] != "Delete":
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+                  logger.info("Skipping non delete request.")
+                  return
+
+              cluster_name = event["StackId"].split("/")[2].split("-")[4]
+
+              logger.info(cluster_name)
+              tag_response = ec2.describe_tags(
+                  Filters=[
+                      {"Name": "tag:Name", "Values": [f"{cluster_name}-EKSBastion"]},
+                  ],
+              )
+
+              get_asg_id_tag_response = ec2.describe_tags(
+                  Filters=[
+                      {"Name": "key", "Values": ["eks:cluster-name"]},
+                      {"Name": "value", "Values": [f"{cluster_name}"]},
+                      {"Name": "resource-type", "Values": ["instance"]},
+                  ],
+              )
+
+
+              if (len(get_asg_id_tag_response["Tags"]) > 1):
+                  asg_one_instance_id = get_asg_id_tag_response["Tags"][0]["ResourceId"]
+                  asg_two_instance_id = get_asg_id_tag_response["Tags"][1]["ResourceId"]
+
+                  asg_one_name_tag_response = ec2.describe_tags(
+                      Filters=[
+                          {"Name": "key", "Values": ["aws:autoscaling:groupName"]},
+                          {"Name": "value", "Values": ["eks-private*"]},
+                          {"Name": "resource-id", "Values": [f"{asg_one_instance_id}"]},
+                      ],
+                  )
+                  asg_one_name = asg_one_name_tag_response["Tags"][0]["Value"]
+
+                  asg_two_name_tag_response = ec2.describe_tags(
+                      Filters=[
+                          {"Name": "key", "Values": ["aws:autoscaling:groupName"]},
+                          {"Name": "value", "Values": ["eks-private*"]},
+                          {"Name": "resource-id", "Values": [f"{asg_two_instance_id}"]},
+                      ],
+                  )
+                  asg_two_name = asg_two_name_tag_response["Tags"][0]["Value"]
+
+                  logger.info("tagone:%s", asg_one_name_tag_response)
+                  logger.info("tagtwo:%s", asg_two_name_tag_response)
+
+                  logger.info("autoscale instance id :%s", asg_one_instance_id)
+                  logger.info("autoscale instance id :%s", asg_two_instance_id)
+                  logger.info("autoscale instance name :%s", asg_one_name)
+                  logger.info("autoscale instance name :%s", asg_two_name)
+
+                  instance_id = tag_response["Tags"][0]["ResourceId"]
+                  ec2.start_instances(InstanceIds=[instance_id])
+                  time.sleep(60)
+                  # Send uninstall telemetry at start
+                  ssm.send_command(
+                      DocumentName="AWS-RunShellScript",
+                      Parameters={
+                          "commands": [
+                              "chmod +x /opt/cloudbridge/bin/uninstall_logging_script.sh",
+                              "/opt/cloudbridge/bin/uninstall_logging_script.sh start",
+                          ]
+                      },
+                      Targets=[{"Key": "tag:Name", "Values": [cluster_name + "-EKSBastion"]}],
+                      CloudWatchOutputConfig={
+                          "CloudWatchLogGroupName": "ConversionsAPIGatewayUninstall",
+                          "CloudWatchOutputEnabled": True,
+                      },
+                  )
+
+                  # Delete cluster and its resources
+                  cluster_delete_response = ssm.send_command(
+                  DocumentName="AWS-RunShellScript",
+                  Parameters={
+                      "commands": [
+                          "chmod +x /opt/cloudbridge/bin/eks_uninstall_script.py",
+                          f"sudo -u ec2-user sudo python3 /opt/cloudbridge/bin/eks_uninstall_script.py \
+                          --cluster_name {cluster_name} \
+                          --autoscale_group_one_name {asg_one_name} \
+                          --autoscale_group_two_name {asg_two_name} \
+                          --autoscale_group_one_id {asg_one_instance_id} \
+                          --autoscale_group_two_id {asg_two_instance_id} \
+                          --region {region}",
+
+                      ]
+                  },
+                  Targets=[{"Key": "tag:Name", "Values": [cluster_name + "-EKSBastion"]}],
+                  CloudWatchOutputConfig={
+                      "CloudWatchOutputEnabled": True,
+                  },
+                  )
+
+                  logger.info("CommandStatus for stack delete is:%s", cluster_delete_response["Command"]["Status"])
+
+
+              #Time it takes to delete EKS cluster resources with an extra buffer
+              time.sleep(820)
+
+              try:
+                  acm.delete_certificate(CertificateArn=self_signed_cert_arn)
+                  logger.info("Deleted self signed certificate.")
+              except acm.exceptions.ResourceNotFoundException:
+                  logger.info("Self signed certificate was already removed.")
+
+              try:
+                  # Get the status of the cluster
+                  cluster_response = eks.describe_cluster(name=cluster_name)
+                  status = cluster_response['cluster']['status']
+                  if status == "DELETING":
+                      logger.info(f"Cluster '{cluster_name}' Deletion was successful.")
+                  else:
+                      logger.info(f"Cluster '{cluster_name}' Deletion was failed.")
+              except eks.exceptions.ResourceNotFoundException:
+                  logger.info(f"Cluster '{cluster_name}' not found. Most likely the cluster was deleted.")
+              except Exception as e :
+                  logger.exception(f"Error while getting cluster status. {e}")
+
+
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+      Description: Lambda function used to uninstall CAPIG stacks automatically.
+      Environment:
+        Variables:
+          SELF_SIGNED_CERT_ARN:
+            Fn::Select:
+              - 3
+              - Fn::Split:
+                  - '"'
+                  - Fn::GetAtt:
+                      - SelfSignedCertWaitCondition
+                      - Data
+      EphemeralStorage:
+        Size: 512
+      FunctionName:
+        Fn::Join:
+          - ""
+          - - CAPIGUninstall-
+            - Fn::Select:
+                - 4
+                - Fn::Split:
+                    - "-"
+                    - Fn::Select:
+                        - 2
+                        - Fn::Split:
+                            - /
+                            - Ref: AWS::StackId
+      Handler: index.handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt:
+          - ConversionsApiGatewayUninstallLambdaRole
+          - Arn
+      Runtime: python3.9
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+      Timeout: 900
+    DependsOn:
+      - CustomVPCPrivate0DefaultEgressOnlyRoute0CBB8974
+      - CustomVPCPrivate0DefaultNatRoute647FD84E
+      - CustomVPCPrivate0RouteTableAssociation1429B372
+      - CustomVPCPrivate1DefaultEgressOnlyRoute6E190E56
+      - CustomVPCPrivate1DefaultNatRoute1E916812
+      - CustomVPCPrivate1RouteTableAssociation2A40B82E
+      - CustomVPCPublic0DefaultRoute34086041
+      - CustomVPCPublic0RouteTableC4A2F788
+      - CustomVPCPublic0RouteTableAssociationCD395678
+      - CustomVPCPublic1DefaultRoute4B970118
+      - CustomVPCPublic1RouteTable36124A34
+      - CustomVPCPublic1RouteTableAssociation4B85F0F6
+      - EKSBastionASG
+      - SelfSignedCertWaitCondition
+  CAPIGUninstallCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CAPIGUninstallLambda
+          - Arn
+  CapigDistributionDD131D32:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+            - PUT
+            - PATCH
+            - POST
+            - DELETE
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          Compress: true
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+          TargetOriginId: eksbastioninstanceCapigDistributionOrigin1031A4667
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        Origins:
+          - CustomOriginConfig:
+              OriginProtocolPolicy: http-only
+              OriginSSLProtocols:
+                - TLSv1.2
+            DomainName:
+              Fn::Select:
+                - 3
+                - Fn::Split:
+                    - '"'
+                    - Fn::GetAtt:
+                        - ALBWaitCondition
+                        - Data
+            Id: eksbastioninstanceCapigDistributionOrigin1031A4667
+            OriginCustomHeaders:
+              - HeaderName: Meta-Capig-Ingress
+                HeaderValue: meta-capig-cloudfront
+        PriceClass: PriceClass_100
+      Tags:
+        - Key: alpha.eksctl.io/cluster-name
+          Value:
+            Fn::Select:
+              - 4
+              - Fn::Split:
+                  - "-"
+                  - Fn::Select:
+                      - 2
+                      - Fn::Split:
+                          - /
+                          - Ref: AWS::StackId
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+    DependsOn:
+      - ALBWaitCondition
+  InfraManagementLambdaFunctionServiceRole44362244:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+  InfraManagementLambdaFunction776BD126:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |-
+          import os
+          import subprocess
+          from urllib.request import urlretrieve
+
+
+          def handler(event, context):
+              script_url = "https://conversions-api-gateway-release-production.s3.us-west-2.amazonaws.com/" \
+                           "infra-lifecycle/scripts/infra_management_fail_safe.py"
+              download_folder = "/tmp/infra-management-toolkit/"
+              download_file_path = download_folder + "infra_management_fail_safe.py"
+              if not os.path.exists(download_folder):
+                  os.makedirs(download_folder)
+
+              urlretrieve(script_url, download_file_path)
+              os.chmod(download_file_path, 0o755)
+              subprocess.call(['python', download_file_path])
+      Environment:
+        Variables:
+          INSTANCE_ID:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+          JOB_TABLE_NAME:
+            Fn::Join:
+              - ""
+              - - infra_management_prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+          HUB_URL:
+            Fn::GetAtt:
+              - CapigDistributionDD131D32
+              - DomainName
+          STACK_ARN:
+            Ref: AWS::StackId
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - InfraManagementLambdaFunctionServiceRole44362244
+          - Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+      Timeout: 900
+    DependsOn:
+      - InfraManagementLambdaFunctionServiceRole44362244
+  InfraManagementLambdaScheduleRule6D6F0FF7:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 hour)
+      State: ENABLED
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - InfraManagementLambdaFunction776BD126
+              - Arn
+          Id: Target0
+  InfraManagementLambdaScheduleRuleAllowEventRuleeksbastioninstanceInfraManagementLambdaFunctionC080AD481C53672B:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - InfraManagementLambdaFunction776BD126
+          - Arn
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+          - InfraManagementLambdaScheduleRule6D6F0FF7
+          - Arn
+  CodeBuildRole728CBADE:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+  CodeBuildRoleDefaultPolicy829527DE:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":logs:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :log-group:/aws/codebuild/
+                    - Ref: InfraManagementDE08CFB8
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":logs:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :log-group:/aws/codebuild/
+                    - Ref: InfraManagementDE08CFB8
+                    - :*
+          - Action:
+              - codebuild:CreateReportGroup
+              - codebuild:CreateReport
+              - codebuild:UpdateReport
+              - codebuild:BatchPutTestCases
+              - codebuild:BatchPutCodeCoverages
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:"
+                  - Ref: AWS::Partition
+                  - ":codebuild:"
+                  - Ref: AWS::Region
+                  - ":"
+                  - Ref: AWS::AccountId
+                  - :report-group/
+                  - Ref: InfraManagementDE08CFB8
+                  - -*
+        Version: "2012-10-17"
+      PolicyName: CodeBuildRoleDefaultPolicy829527DE
+      Roles:
+        - Ref: CodeBuildRole728CBADE
+  InfraManagementDE08CFB8:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Cache:
+        Type: NO_CACHE
+      EncryptionKey: alias/aws/s3
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: INSTANCE_ID
+            Type: PLAINTEXT
+            Value:
+              Fn::Join:
+                - ""
+                - - prod-
+                  - Fn::Select:
+                      - 2
+                      - Fn::Split:
+                          - /
+                          - Ref: AWS::StackId
+          - Name: ECR_IMAGE_URL
+            Type: PLAINTEXT
+            Value: public.ecr.aws/fbconvservice/swak-ops:1.10.0
+          - Name: JOB_TABLE_NAME
+            Type: PLAINTEXT
+            Value:
+              Fn::Join:
+                - ""
+                - - infra_management_prod-
+                  - Fn::Select:
+                      - 2
+                      - Fn::Split:
+                          - /
+                          - Ref: AWS::StackId
+          - Name: HUB_URL
+            Type: PLAINTEXT
+            Value:
+              Fn::GetAtt:
+                - CapigDistributionDD131D32
+                - DomainName
+          - Name: STACK_ARN
+            Type: PLAINTEXT
+            Value:
+              Ref: AWS::StackId
+        Image: public.ecr.aws/fbconvservice/swak-ops:1.10.0
+        ImagePullCredentialsType: SERVICE_ROLE
+        PrivilegedMode: false
+        Type: LINUX_CONTAINER
+      ServiceRole:
+        Fn::GetAtt:
+          - CodeBuildRole728CBADE
+          - Arn
+      Source:
+        BuildSpec: |-
+          {
+            "version": "0.2",
+            "phases": {
+              "build": {
+                "commands": [
+                  "echo 'Fetching the init file'",
+                  "curl -o /tmp/init.py https://conversions-api-gateway-release-production.s3.us-west-2.amazonaws.com/infra-lifecycle/scripts/infra_management_code_build_init.py",
+                  "echo 'Executing the init file'",
+                  "python /tmp/init.py"
+                ]
+              }
+            }
+          }
+        Type: NO_SOURCE
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+      TimeoutInMinutes: 120
+  JobTable0F869D99:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TableName:
+        Fn::Join:
+          - ""
+          - - infra_management_prod-
+            - Fn::Select:
+                - 2
+                - Fn::Split:
+                    - /
+                    - Ref: AWS::StackId
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+  LambdaCodeBuildRole6A435DEA:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      Description: IAM role for Lambda function to trigger CodeBuild
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+  LambdaCodeBuildRoleDefaultPolicy91FA4403:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: codebuild:StartBuild
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:aws:codebuild:"
+                  - Ref: AWS::Region
+                  - ":"
+                  - Ref: AWS::AccountId
+                  - :project/
+                  - Ref: InfraManagementDE08CFB8
+        Version: "2012-10-17"
+      PolicyName: LambdaCodeBuildRoleDefaultPolicy91FA4403
+      Roles:
+        - Ref: LambdaCodeBuildRole6A435DEA
+  CodeBuildLambdaFunctionBC2828BB:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |-
+          import json
+
+          import boto3
+          import os
+          from urllib import request
+
+
+          def handler(event, context):
+              # Access the custom parameters from the SNS message payload
+              message_attributes = event['Records'][0]['Sns']['MessageAttributes']
+              incoming_instance_ids = message_attributes.get('instance_ids', None)
+              if incoming_instance_ids is not None:
+                  incoming_instance_ids = incoming_instance_ids['Value']
+
+              incoming_rollout_bucket = message_attributes.get('rollout_bucket', None)
+              if incoming_rollout_bucket is not None:
+                  incoming_rollout_bucket = str(incoming_rollout_bucket['Value'])
+
+              # Only trigger code pipeline for the configured instance_id or rollout bucket and skip otherwise
+              if is_updates_allowed(incoming_rollout_bucket=incoming_rollout_bucket,
+                                    incoming_instance_ids= incoming_instance_ids):
+                  print('Triggering code build')
+                  # Initialize the CodeBuild client
+                  codebuild = boto3.client('codebuild')
+
+                  # Specify the CodeBuild project name
+                  project_name = os.environ['CODE_BUILD_PROJECT_NAME']
+
+                  # Start the build
+                  response = codebuild.start_build(
+                      projectName=project_name,
+                      artifactsOverride={"type": "NO_ARTIFACTS"}
+                  )
+
+                  # Handle the response
+                  build_id = response['build']['id']
+                  print(f'Started CodeBuild project {project_name} with build ID {build_id}')
+                  return
+
+              print(f'configured instance_id {os.environ["INSTANCE_ID"]} is not present in input parameters')
+
+
+          def is_updates_allowed(incoming_rollout_bucket, incoming_instance_ids) -> bool:
+              try:
+                  hub_url = os.environ['HUB_URL']
+                  if not hub_url.startswith('https://'):
+                      hub_url = f"https://{hub_url}"
+                  hub_health_endpoint = f"{hub_url}/hub/health"
+                  response = request.urlopen(hub_health_endpoint, timeout=20)
+                  data = response.read()
+                  payload = json.loads(data)
+                  for check in payload['checks']:
+                      if check.get('id') == 'liveness':
+                          is_automatic_updates_allowed = str(check['data']['automatic_updates_status']).lower() == 'true'
+                          rollout_bucket = str(check['data']['rollout_bucket'])
+                          return is_automatic_updates_allowed and \
+                              (
+                                      is_rollout_allowed_by_bucket(incoming_rollout_bucket=incoming_rollout_bucket,
+                                                                   instance_rollout_bucket=rollout_bucket)
+
+                                      or is_rollout_allowed_by_instance_id(incoming_instance_ids)
+                              )
+              except Exception as err:
+                  print(err)
+                  return False
+
+
+          def is_rollout_allowed_by_instance_id(incoming_instance_ids) -> bool:
+              configured_instance_id = os.environ['INSTANCE_ID']
+              return incoming_instance_ids is not None \
+                  and (configured_instance_id in incoming_instance_ids
+                       or "ALL" in incoming_instance_ids)
+
+
+          def is_rollout_allowed_by_bucket(incoming_rollout_bucket, instance_rollout_bucket) -> bool:
+              return incoming_rollout_bucket is not None and incoming_rollout_bucket == instance_rollout_bucket
+      Environment:
+        Variables:
+          CODE_BUILD_PROJECT_NAME:
+            Ref: InfraManagementDE08CFB8
+          INSTANCE_ID:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+          HUB_URL:
+            Fn::GetAtt:
+              - CapigDistributionDD131D32
+              - DomainName
+          STACK_ARN:
+            Ref: AWS::StackId
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - LambdaCodeBuildRole6A435DEA
+          - Arn
+      Runtime: python3.8
+      Tags:
+        - Key: Application
+          Value: Conversions API Gateway
+        - Key: conversions-api-gateway-resource
+          Value: ""
+        - Key: InstanceId
+          Value:
+            Fn::Join:
+              - ""
+              - - prod-
+                - Fn::Select:
+                    - 2
+                    - Fn::Split:
+                        - /
+                        - Ref: AWS::StackId
+        - Key: MainStack
+          Value:
+            Ref: AWS::StackName
+      Timeout: 900
+    DependsOn:
+      - LambdaCodeBuildRoleDefaultPolicy91FA4403
+      - LambdaCodeBuildRole6A435DEA
+  CodeBuildLambdaFunctionAllowInvokeeksbastioninstanceExternalSNSTopicD4C1B676C54485C8:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - CodeBuildLambdaFunctionBC2828BB
+          - Arn
+      Principal: sns.amazonaws.com
+      SourceArn: arn:aws:sns:us-east-2:578985338881:infra-management
+  CodeBuildLambdaFunctionExternalSNSTopicFC1708E4:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint:
+        Fn::GetAtt:
+          - CodeBuildLambdaFunctionBC2828BB
+          - Arn
+      Protocol: lambda
+      Region: us-east-2
+      TopicArn: arn:aws:sns:us-east-2:578985338881:infra-management
+Conditions:
+  useT3Nano:
+    Fn::Or:
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - eu-south-1
+      - Fn::Equals:
+          - Ref: AWS::Region
+          - eu-north-1
+Outputs:
+  InstallationLogLocation:
+    Description: Installation status and progress will be available in this Cloudwatch Logs group.
+    Value:
+      Fn::Join:
+        - ""
+        - - https://
+          - Ref: AWS::Region
+          - .console.aws.amazon.com/cloudwatch/home?region=
+          - Ref: AWS::Region
+          - "#logsV2:log-groups/log-group/ConversionsAPIGateway$252Fcloud-init-output.log/log-events/"
+          - Fn::Select:
+              - 3
+              - Fn::Split:
+                  - '"'
+                  - Fn::GetAtt:
+                      - BastionWaitCondition
+                      - Data
+  BastionHost:
+    Description: View bastion host in AWS console.
+    Value:
+      Fn::Join:
+        - ""
+        - - https://
+          - Ref: AWS::Region
+          - .console.aws.amazon.com/ec2/home?region=
+          - Ref: AWS::Region
+          - "#Instances:search="
+          - Fn::Select:
+              - 3
+              - Fn::Split:
+                  - '"'
+                  - Fn::GetAtt:
+                      - BastionWaitCondition
+                      - Data
+  CapigSetupURL:
+    Description: Please continue setup for Conversions API Gateway
+    Value:
+      Fn::Join:
+        - ""
+        - - "Use the following url to continue with Conversions API Gateway setup: "
+          - Fn::GetAtt:
+              - CapigDistributionDD131D32
+              - DomainName
+          - /auth/create-system-admin/?invite=
+          - Fn::GetAtt:
+              - ConversionsApiGatewayBastionIamRole
+              - RoleId
+
