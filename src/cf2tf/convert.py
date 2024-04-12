@@ -364,7 +364,7 @@ class TemplateConverter:
             conditional = resource_values.get("Condition")
 
             if conditional is not None:
-                condition_map = {"count": LiteralType(f"locals.{conditional} ? 1 : 0")}
+                condition_map = {"count": LiteralType(f"local.{conditional} ? 1 : 0")}
                 arguments = MapType({**condition_map, **arguments})
 
             resource = Resource(
