@@ -20,7 +20,7 @@ GitPython = "^3.1.27"
 thefuzz = {extras = ["speedup"], version = "^0.22.0"}
 click-log = "^0.4.0"
 requests = "^2.27.1"
-pytest = "^7.1.2"
+pytest = "^8.0.0"
 
 [tool.poetry.dev-dependencies]
 black = "^23.0.0"
