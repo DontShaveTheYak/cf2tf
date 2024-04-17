@@ -9,6 +9,11 @@ on:
     branches:
       - develop
       - master
+  pull_request:
+    types: closed
+    branches:
+      - develop
+      - master
 
 jobs:
   check:
