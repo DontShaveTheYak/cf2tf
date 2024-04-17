@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4.1.1
 
       - name: Setup Latest Python
-        uses: actions/setup-python@v4.7.1
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: 3.11
           architecture: x64
@@ -41,7 +41,7 @@ jobs:
         run: coverage xml --fail-under=0
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.1.4
+        uses: codecov/codecov-action@v4.3.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v4.1.1
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4.7.1
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
