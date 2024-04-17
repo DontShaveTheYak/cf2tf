@@ -1,6 +1,5 @@
 """Defines classes and methods for creating and interacting with HCL syntax."""
 
-
 import logging
 from typing import Any, Dict, List, Optional
 

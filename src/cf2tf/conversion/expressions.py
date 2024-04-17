@@ -3,6 +3,7 @@
 This module contains the logic to convert an AWS intrinsic function/conditional to
 it's Terraform equivalent.
 """
+
 import logging
 import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
