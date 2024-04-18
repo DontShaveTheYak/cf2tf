@@ -4,21 +4,43 @@ on:
   push:
     branches:
       - "master"
+  pull_request_target:
+    types: [opened, synchronize, reopened]
   pull_request:
-    paths-ignore:
-      - ".github/workflows/release.yml"
-      - ".github/workflows/pr_checks.yml"
+    types: [opened, synchronize, reopened]
 
 jobs:
+  check:
+    name: Check Permissions
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Get User Permission
+        id: checkAccess
+        uses: actions-cool/check-user-permission@v2
+        with:
+          require: write
+          username: ${{ github.triggering_actor }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check User Permission
+        if: steps.checkAccess.outputs.require-result == 'false'
+        run: |
+          echo "${{ github.triggering_actor }} does not have permissions on this repo."
+          echo "Current permission level is ${{ steps.checkAccess.outputs.user-permission }}"
+          echo "Job originally triggered by ${{ github.actor }}"
+          exit 1
   single:
     runs-on: ubuntu-latest
     name: Python 3.11
+    needs: check
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4.1.1
 
       - name: Setup Latest Python
-        uses: actions/setup-python@v4.7.1
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: 3.11
           architecture: x64
@@ -41,7 +63,7 @@ jobs:
         run: coverage xml --fail-under=0
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.1.4
+        uses: codecov/codecov-action@v4.3.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
@@ -59,7 +81,7 @@ jobs:
         uses: actions/checkout@v4.1.1
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4.7.1
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64

@@ -3,28 +3,36 @@
 {
 	"name": "${localWorkspaceFolderBasename}",
 	"build": {
-		"dockerfile": "Dockerfile",
+		"dockerfile": "Dockerfile"
 	},
 	// Set *default* container specific settings.json values on container create.
-	"settings": {
-		"python.analysis.diagnosticSeverityOverrides": {
-			"reportGeneralTypeIssues": "none"
-		},
-		"terminal.integrated.profiles.linux": {
-			"bash": {
-				"path": "/usr/bin/bash",
-				"icon": "terminal-bash"
-			}
-		},
-		"terminal.integrated.defaultProfile.linux": "bash"
-	},
 	// Add the IDs of extensions you want installed when the container is created.
-	"extensions": [
-		"ms-azuretools.vscode-docker",
-		"eamodio.gitlens",
-		"ms-python.python",
-		"njpwerner.autodocstring"
-	],
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.analysis.diagnosticSeverityOverrides": {
+					"reportGeneralTypeIssues": "none"
+				},
+				"terminal.integrated.profiles.linux": {
+					"bash": {
+						"path": "/usr/bin/bash",
+						"icon": "terminal-bash"
+					}
+				},
+				"terminal.integrated.defaultProfile.linux": "bash"
+			},
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+				"eamodio.gitlens",
+				"ms-python.python",
+				"njpwerner.autodocstring",
+				"ms-python.black-formatter",
+				"ms-python.flake8",
+				"matangover.mypy",
+				"ms-python.isort"
+			]
+		}
+	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
