@@ -982,6 +982,7 @@ ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
         **ALLOWED_NESTED_CONDITIONS,
         "Fn::Join": join,
         "Fn::Select": select,
+        "Fn::Sub": sub,
     },
     "Fn::If": {
         "Fn::Base64": base64,
