@@ -540,11 +540,11 @@ def get_azs(template: "TemplateConverter", region: Any):
 
     if not data:
         az_data = hcl2.Data(
-            "available", "availability_zones", {"state": StringType("available")}
+            "available", "aws_availability_zones", {"state": StringType("available")}
         )
         template.post_proccess_blocks.insert(0, az_data)
 
-    return LiteralType("data.aws_availability_zones.available.names")
+    return az_data.ref("names")
 
 
 # todo Handle functions that are not applicable to terraform.
