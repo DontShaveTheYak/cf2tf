@@ -173,10 +173,7 @@ class TemplateConverter:
                 # This takes care of keys that not intrinsic functions,
                 #  except for the condition func
                 if "Fn::" not in key and key != "Condition":
-                    data[key] = self.resolve_values(
-                        value,
-                        allowed_func,
-                    )
+                    data[key] = self.resolve_values(value, allowed_func, prev_func)
                     continue
 
                 # Takes care of the tricky 'Condition' key
@@ -194,23 +191,24 @@ class TemplateConverter:
                         return functions.condition(self, value)
 
                     # Normal key like in an IAM role
-                    data[key] = self.resolve_values(
-                        value,
-                        allowed_func,
-                    )
+                    data[key] = self.resolve_values(value, allowed_func, prev_func)
                     continue
 
                 if key not in allowed_func:
                     raise ValueError(f"{key} not allowed to be nested in {prev_func}.")
 
+                prev_func = key
+
                 value = self.resolve_values(
-                    value, functions.ALLOWED_FUNCTIONS[key], key
+                    value, functions.ALLOWED_FUNCTIONS[key], prev_func
                 )
 
                 try:
                     return allowed_func[key](self, value)
-                except Exception:
-                    return CommentType(f"Unable to resolve {key} with value: {value}")
+                except Exception as e:
+                    return CommentType(
+                        f"Unable to resolve {key} with value: {value} because {e}"
+                    )
 
             return MapType(data)
         elif isinstance(data, list):

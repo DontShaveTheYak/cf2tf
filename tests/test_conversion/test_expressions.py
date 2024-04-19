@@ -298,11 +298,20 @@ def test_find_in_map(fake_tc: TemplateConverter):
 
 
 def test_get_att(fake_tc: TemplateConverter):
-    # Test that it will only take a list
+
     with pytest.raises(TypeError) as type_error:
         expressions.get_att(fake_tc, {})
 
-    assert "Fn::GetAtt - The values must be a List, not dict." in str(type_error)
+    assert "Fn::GetAtt - The value must be a String or List, not dict." in str(
+        type_error
+    )
+    # Test that string must be in the correct format
+    with pytest.raises(ValueError) as value_error:
+        expressions.get_att(fake_tc, "foo")
+
+    assert "Fn::GetAtt - The value must contain a resource id and an attribute." in str(
+        value_error
+    )
 
     # Test that list size must be two
     with pytest.raises(ValueError) as value_error:
@@ -340,6 +349,10 @@ def test_get_att(fake_tc: TemplateConverter):
     test_attr = "template_url"
     expected_result = f"aws_cloudformation_stack.{resource_id}.{test_attr}"
     result = expressions.get_att(fake_tc, [resource_id, test_attr])
+
+    assert result == expected_result
+
+    result = expressions.get_att(fake_tc, f"{resource_id}.{test_attr}")
 
     assert result == expected_result
 
@@ -394,7 +407,7 @@ def test_get_att_nested(fake_tc: TemplateConverter):
 
     expected_result = f"aws_cloudformation_stack.{resource_id}.{test_attr.lower()}"
 
-    result = expressions.get_att(fake_tc, [resource_id, test_attr])
+    result = expressions.get_att(fake_tc, f"{resource_id}.{test_attr}")
 
     assert result == expected_result
 
