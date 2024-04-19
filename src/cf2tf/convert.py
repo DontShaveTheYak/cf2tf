@@ -205,8 +205,10 @@ class TemplateConverter:
 
                 try:
                     return allowed_func[key](self, value)
-                except Exception:
-                    return CommentType(f"Unable to resolve {key} with value: {value}")
+                except Exception as e:
+                    return CommentType(
+                        f"Unable to resolve {key} with value: {value} because {e}"
+                    )
 
             return MapType(data)
         elif isinstance(data, list):
