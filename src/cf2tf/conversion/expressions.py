@@ -994,6 +994,7 @@ ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
         "Fn::Select": select,
         "Fn::Sub": sub,
         "Ref": ref,
+        "Fn::Split": split,
     },
     "Fn::Not": ALLOWED_NESTED_CONDITIONS,
     "Fn::Or": ALLOWED_NESTED_CONDITIONS,
