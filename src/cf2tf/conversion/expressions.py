@@ -359,19 +359,68 @@ def get_att(template: "TemplateConverter", values: Any):
         values (Any): The values passed to the function.
 
     Raises:
-        TypeError: If values is not a list.
-        ValueError: If length of values is not 3.
-        TypeError: If the logicalNameOfResource and attributeName are not str.
-        KeyError: If the logicalNameOfResource is not found in the template.
+        TypeError: If values is not a String.
 
     Returns:
-        str: Terraform equivalent expression.
+        LiteralType: Terraform equivalent expression.
     """
 
-    if not isinstance(values, List):
-        raise TypeError(
-            f"Fn::GetAtt - The values must be a List, not {type(values).__name__}."
+    if isinstance(values, (str, StringType)):
+        return _get_att_string(template, values)
+
+    if isinstance(values, list):
+        return _get_att_list(template, values)
+
+    raise TypeError(
+        f"Fn::GetAtt - The value must be a String or List, not {type(values).__name__}."
+    )
+
+
+def _get_att_string(template: "TemplateConverter", values: Any):
+    """Converts AWS GetAtt intrinsic function to it's Terraform equivalent.
+
+    Args:
+        template (Configuration): The template being tested.
+        values (Any): The values passed to the function.
+
+    Raises:
+        ValueError: If the value doesn't contain a resource id and an attribute.
+
+    Returns:
+        LiteralType: Terraform equivalent expression.
+    """
+
+    if "." not in values:
+        raise ValueError(
+            "Fn::GetAtt - The value must contain a resource id and an attribute."
         )
+
+    parts = values.split(".")
+
+    resouce_id = parts[0]
+
+    attributes = ".".join(parts[1:])
+
+    result = _get_att_list(template, [resouce_id, attributes])
+
+    return result
+
+
+def _get_att_list(template: "TemplateConverter", values: Any):
+    """Converts AWS GetAtt intrinsic function to it's Terraform equivalent.
+
+    Args:
+        template (Configuration): The template being tested.
+        values (Any): The values passed to the function.
+
+    Raises:
+        ValueError: If the values length is not 2.
+        TypeError: If the values are not strings.
+
+    Returns:
+        LiteralType: Terraform equivalent expression.
+    """
+
     if not len(values) == 2:
         raise ValueError(
             (
@@ -712,7 +761,7 @@ def sub_s(template: "TemplateConverter", value: str):
 
             attributes = ".".join(parts[1:])
 
-            result = get_att(template, [resouce_id, attributes])
+            result = _get_att_list(template, [resouce_id, attributes])
         else:
             result = ref(template, var)
 
@@ -775,7 +824,7 @@ def sub_l(template: "TemplateConverter", values: List):
 
             attributes = ".".join(parts[1:])
 
-            result = get_att(template, [resouce_id, attributes])
+            result = _get_att_list(template, [resouce_id, attributes])
         else:
             result = ref(template, var)
 
@@ -982,6 +1031,7 @@ ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
         **ALLOWED_NESTED_CONDITIONS,
         "Fn::Join": join,
         "Fn::Select": select,
+        "Fn::Sub": sub,
     },
     "Fn::If": {
         "Fn::Base64": base64,
@@ -993,6 +1043,7 @@ ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
         "Fn::Select": select,
         "Fn::Sub": sub,
         "Ref": ref,
+        "Fn::Split": split,
     },
     "Fn::Not": ALLOWED_NESTED_CONDITIONS,
     "Fn::Or": ALLOWED_NESTED_CONDITIONS,
@@ -1001,6 +1052,7 @@ ALLOWED_FUNCTIONS: Dict[str, Dispatch] = {
     "Fn::Cidr": {
         "Fn::Select": select,
         "Ref": ref,
+        "Fn::GetAtt": get_att,
     },
     "Fn::FindInMap": {
         "Fn::FindInMap": find_in_map,
