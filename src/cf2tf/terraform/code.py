@@ -11,7 +11,7 @@ from git import RemoteProgress
 from git.repo.base import InvalidGitRepositoryError, Repo
 from thefuzz import fuzz, process  # type: ignore
 
-import cf2tf.convert
+# import cf2tf.convert
 
 log = logging.getLogger("cf2tf")
 
@@ -35,7 +35,7 @@ class SearchManager:
         ranking: int
         doc_path: Path
         resource_name, ranking, doc_path = process.extractOne(
-            name.lower(), files, scorer=fuzz.token_sort_ratio
+            name.lower(), files, scorer=fuzz.ratio
         )
 
         log.debug(
@@ -109,9 +109,11 @@ def resource_type_to_name(resource_type: str) -> str:
 
     search_tokens = resource_type.replace("::", " ").replace("AWS", " ").split(" ")
 
-    for i, token in enumerate(search_tokens):
-        if len(token) >= 4:
-            search_tokens[i] = cf2tf.convert.camel_case_split(token)
+    # I will leave the logic for camel case splitting here for now.
+    # in case we want to use it later.
+    # for i, token in enumerate(search_tokens):
+    #     if len(token) >= 4:
+    #         search_tokens[i] = cf2tf.convert.camel_case_split(token)
 
     search_term = " ".join(search_tokens).lower().strip()
 
