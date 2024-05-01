@@ -1,9 +1,8 @@
+import logging
+import re
 from io import TextIOWrapper
 from pathlib import Path
 from typing import List
-import re
-
-import logging
 
 log = logging.getLogger("cf2tf")
 

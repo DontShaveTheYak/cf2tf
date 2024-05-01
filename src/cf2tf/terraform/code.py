@@ -1,14 +1,14 @@
 import logging
 import re
 from pathlib import Path
+from shutil import rmtree
 from tempfile import gettempdir
 from typing import Optional
-from shutil import rmtree
 
 import click
 from click._termui_impl import ProgressBar
 from git import RemoteProgress
-from git.repo.base import Repo, InvalidGitRepositoryError
+from git.repo.base import InvalidGitRepositoryError, Repo
 from thefuzz import fuzz, process  # type: ignore
 
 import cf2tf.convert
