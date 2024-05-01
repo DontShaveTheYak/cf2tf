@@ -5,8 +5,8 @@ import pytest
 from cf2tf.terraform.code import (
     SearchManager,
     resource_type_to_name,
-    transform_file_name,
     search_manager,
+    transform_file_name,
 )
 
 
