@@ -88,7 +88,7 @@ def parse_items(file: TextIOWrapper):
             continue
 
         # These should be the attributes we are after
-        if line[0] == "*":
+        if line[0] == "*" or line[0] == "-":
             regex = r"`([\w.*]+)`"
 
             match = re.search(regex, line)
