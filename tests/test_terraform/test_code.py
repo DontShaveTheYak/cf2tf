@@ -31,6 +31,7 @@ sm_find_tests = [
     ("AWS::Lambda::Function", "lambda_function.html.markdown"),
     ("AWS::Events::Rule", "cloudwatch_event_rule.html.markdown"),
     ("AWS::Cognito::UserPool", "cognito_user_pool.html.markdown"),
+    ("AWS::AutoScaling::AutoScalingGroup", "autoscaling_group.html.markdown"),
 ]
 
 
@@ -51,8 +52,8 @@ def test_transform_file_name():
 
 type_to_name_tests = [
     ("AWS::Ec2::Instance", "ec2 instance"),
-    ("AWS::EC2::RouteTable", "ec2 route table"),
-    ("AWS::RDS::DBSubnetGroup", "rds db subnet group"),
+    ("AWS::EC2::RouteTable", "ec2 routetable"),
+    ("AWS::RDS::DBSubnetGroup", "rds dbsubnetgroup"),
     ("AWS::S3::Bucket", "s3 bucket"),
 ]
 
