@@ -622,7 +622,7 @@ def add_space():
 def perform_resource_overrides(
     tf_type: str, params: Dict[str, TerraformType], tc: TemplateConverter
 ):
-    log.debug("Overiding params for {tf_type}")
+    log.debug(f"Overiding params for {tf_type}")
     if tf_type not in OVERRIDE_DISPATCH:
         return params
 
@@ -638,7 +638,7 @@ def perform_resource_overrides(
 def perform_global_overrides(
     tf_type: str, params: Dict[str, TerraformType], tc: TemplateConverter
 ):
-    log.debug("Performing global overrides for {tf_type}")
+    log.debug(f"Performing global overrides for {tf_type}")
 
     for param, override in GLOBAL_OVERRIDES.items():
         if param in params:

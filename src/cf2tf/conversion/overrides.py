@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING, Callable, Dict
 
+from cf2tf.terraform.hcl2.complex import ListType, MapType
 from cf2tf.terraform.hcl2.custom import LiteralType
 from cf2tf.terraform.hcl2.primitive import NullType, StringType, TerraformType
-from cf2tf.terraform.hcl2.complex import ListType, MapType
 
 if TYPE_CHECKING:
     from cf2tf.convert import TemplateConverter
@@ -50,14 +50,33 @@ def tag_conversion(_tc: "TemplateConverter", params: CFParams) -> CFParams:
     if isinstance(params["Tags"], dict):
         return params
 
-    orginal_tags: ListType = params["Tags"]  # type: ignore
+    original_tags: ListType = params["Tags"]  # type: ignore
 
-    new_tags = {LiteralType(tag["Key"]): tag["Value"] for tag in orginal_tags}
+    first_item = original_tags[0]
 
-    del params["Tags"]
-    params["tags"] = MapType(new_tags)
+    # It's possible that the tags might be one or more
+    # conditional statements of LiteralType
+    # This wont fix every case, but it should fix most
+    # and it's better than nothing
+    if not isinstance(first_item, (dict, MapType)):
+        del params["Tags"]
+        params["tags"] = first_item
+        return params
 
-    return params
+    try:
+        new_tags = {LiteralType(tag["Key"]): tag["Value"] for tag in original_tags}
+
+        del params["Tags"]
+        params["tags"] = MapType(new_tags)
+        return params
+    except Exception:
+        del params["Tags"]
+        params["tags"] = LiteralType(
+            f"// Could not convert tags: {original_tags.render(4)}"
+        )
+        return params
+
+    raise Exception("Could not convert tags")
 
 
 OVERRIDE_DISPATCH: ResourceOverride = {

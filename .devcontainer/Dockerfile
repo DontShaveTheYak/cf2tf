@@ -1,6 +1,6 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
-ARG USERNAME=vscode
+ARG USERNAME=ubuntu
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
@@ -8,11 +8,7 @@ ARG USER_GID=$USER_UID
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Create the user
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    #
-    # [Optional] Add sudo support. Omit if you don't need to install software after connecting.
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y sudo \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
@@ -43,12 +39,12 @@ SHELL ["/bin/bash","--login", "-c"]
 
 # Stuff needed to make pyenv work correctly since the login shell
 # above doesnt seem to run bachrc
-ENV PYENV_ROOT="/home/vscode/.pyenv"
+ENV PYENV_ROOT="/home/ubuntu/.pyenv"
 ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
 
 # Install the required python versions (this takes a bit usually) so we do lots of cacheing
-RUN --mount=type=cache,target=/home/vscode/.pyenv/cache,uid=1000 \
+RUN --mount=type=cache,target=/home/ubuntu/.pyenv/cache,uid=1000 \
     pyenv install -s 3.8.18 && \
     pyenv install -s 3.9.18 && \
     pyenv install -s 3.10.13 && \
