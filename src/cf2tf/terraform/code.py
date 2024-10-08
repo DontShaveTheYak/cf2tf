@@ -15,6 +15,14 @@ from thefuzz import fuzz, process  # type: ignore
 
 log = logging.getLogger("cf2tf")
 
+MAPPINGS = {
+    "AWS::EC2::EIP": "aws_eip",
+    "AWS::EC2::Instance": "aws_instance",
+    "AWS::ElasticLoadBalancing::LoadBalancer": "aws_lb",
+    "AWS::AutoScaling::LaunchConfiguration": "aws_launch_configuration"
+}
+
+
 
 class SearchManager:
     def __init__(self, docs_path: Path) -> None:
@@ -25,22 +33,33 @@ class SearchManager:
     def find(self, resource_type: str) -> Path:
         name = resource_type_to_name(resource_type)
 
-        log.debug(f"Searcing for {name} in terraform docs...")
+        log.debug(f"Searching for {name} in terraform docs...")
 
         files = {
             doc_file: transform_file_name(doc_file.name) for doc_file in self.resources
         }
 
-        resource_name: str
-        ranking: int
-        doc_path: Path
-        resource_name, ranking, doc_path = process.extractOne(
-            name.lower(), files, scorer=fuzz.ratio
-        )
 
-        log.debug(
-            f"Best match was {resource_name} at {doc_path} with score of {ranking}."
-        )
+        resource_name: str
+        doc_path: Path
+
+        if MAPPINGS.get(resource_type):
+            log.debug("Found fixed mapping for resource type.")
+            resource_name, ranking, doc_path = process.extractOne(
+                MAPPINGS.get(resource_type), files, scorer=fuzz.ratio
+            )
+            log.debug(
+                f"Best match was {resource_name} at {doc_path} with score of {ranking}."
+            )
+
+
+        else:
+            resource_name, ranking, doc_path = process.extractOne(
+                name.lower(), files, scorer=fuzz.ratio
+            )
+            log.debug(
+                f"Best match was {resource_name} at {doc_path} with score of {ranking}."
+            )
 
         return doc_path
 
