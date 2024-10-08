@@ -19,7 +19,8 @@ MAPPINGS = {
     "AWS::EC2::EIP": "aws_eip",
     "AWS::EC2::Instance": "aws_instance",
     "AWS::ElasticLoadBalancing::LoadBalancer": "aws_lb",
-    "AWS::AutoScaling::LaunchConfiguration": "aws_launch_configuration"
+    "AWS::AutoScaling::LaunchConfiguration": "aws_launch_configuration",
+    "AWS::EC2::VPCGatewayAttachment": "aws_internet_gateway_attachment",
 }
 
 

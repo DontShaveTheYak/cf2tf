@@ -17,12 +17,18 @@ log = logging.getLogger("cf2tf")
 click_log.basic_config(log)
 
 
+def get_stack_name(stack: str) -> str:
+    """Extracts the stack name from an ARN if necessary."""
+    if stack.startswith("arn:"):
+        return stack.split("/")[-2]
+    return stack
+
 @click.command()  # type: ignore
 @click.version_option()
 @click.option("--output", "-o", type=click.Path(exists=False))
 @click_log.simple_verbosity_option(log)
-@click.argument("stack_name", type=click.STRING)
-def cli(output: Optional[str], stack_name: str):
+@click.argument("stack", type=click.STRING)
+def cli(output: Optional[str], stack: str):
     """Convert Cloudformation template into Terraform.
 
     Args:
@@ -32,11 +38,12 @@ def cli(output: Optional[str], stack_name: str):
 # Download the CloudFormation template from AWS
     client = boto3.client('cloudformation')
     response = client.get_template(
-        StackName=stack_name
+        StackName=stack
     )
     cf_template_json = response['TemplateBody']
 
     # Save the CloudFormation template to a file in JSON format
+    stack_name = get_stack_name(stack)
     tmpl_path = Path(f"{stack_name}.json")
     with tmpl_path.open('w') as f:
         json.dump(cf_template_json, f, indent=4)
@@ -59,7 +66,7 @@ def cli(output: Optional[str], stack_name: str):
     # generate import statements for the resources
     # pull existing resources from the cloudformation stack
     response = client.describe_stack_resources(
-        StackName=stack_name
+        StackName=stack
     )
     stack_resources = response['StackResources']
 
@@ -71,9 +78,8 @@ def cli(output: Optional[str], stack_name: str):
 
     def generate_import_statement(resource_type, resource_name, cf_resource):
         identifier = None
-        match resource_type.replace('"',''):
-            case "aws_iam_role":
-                identifier = cf_resource['PhysicalResourceId']
+        if resource_type.replace('"','') in ['aws_iam_role','aws_vpc','aws_route_table','aws_subnet','aws_route_table_association']:
+            identifier = cf_resource['PhysicalResourceId']
         if identifier:
             return f"terraform import {resource_type}.{resource_name} '{identifier}'"
 
