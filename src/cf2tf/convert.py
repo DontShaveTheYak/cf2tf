@@ -26,6 +26,12 @@ if TYPE_CHECKING:
     from cf2tf.terraform.code import SearchManager
 
 
+IGNORED_PROPERTIES = {
+    'AWS::EC2::Instance': ['UserData'],
+    'AWS::AutoScaling::LaunchConfiguration': ['UserData'],
+}
+
+
 # Wish I could go back to this style of import but getting cycle error
 # from cf2tf.terraform import doc_file, Configuration
 
@@ -332,6 +338,10 @@ class TemplateConverter:
 
             properties: Dict[str, Any] = resource_values.get("Properties", {})
 
+            # remove ignored properties
+            for ignored_arg in IGNORED_PROPERTIES.get(resource_type, []):
+                properties.pop(ignored_arg, None)
+
             arguments = MapType(properties)
 
             if properties:
@@ -355,7 +365,7 @@ class TemplateConverter:
 
                 log.debug("Converting property names to argument names...")
 
-                arguments = props_to_args(overrided_values, valid_arguments, docs_path)
+                arguments = props_to_args(tf_type, overrided_values, valid_arguments, docs_path)
 
                 log.debug(f"Converted properties to {arguments}")
 
@@ -366,7 +376,7 @@ class TemplateConverter:
                 arguments = MapType({**condition_map, **arguments})
 
             resource = Resource(
-                tf_name, tf_type, arguments, valid_arguments, valid_attributes
+                tf_name, tf_type, arguments, valid_arguments, valid_attributes,resource_id, resource_values
             )
             tf_resources.append(resource)
 
@@ -483,6 +493,7 @@ def contains_functions(self, data: Dict[str, Any]):
 
 
 def props_to_args(
+    tf_type: str,
     cf_props: Dict[str, AllTypes],
     valid_tf_arguments: List[str],
     docs_path: Path,
@@ -493,7 +504,7 @@ def props_to_args(
     converted_attrs: Dict[str, AllTypes] = {}
 
     for prop_name, prop_value in cf_props.items():
-        tf_arg_name, tf_arg_value = convert_prop_to_arg(
+        tf_arg_name, tf_arg_value = convert_prop_to_arg(tf_type,
             prop_name, prop_value, search_items, docs_path
         )
 
@@ -505,25 +516,31 @@ def props_to_args(
 
 
 def convert_prop_to_arg(
+    tf_type: str,
     prop_name: str, prop_value: AllTypes, search_items: List[str], docs_path: Path
 ) -> Tuple[str, AllTypes]:
-    search_term = camel_case_split(prop_name)
 
-    log.debug(f"Searching for {search_term} instead of {prop_name}")
+    if tf_type=="aws_vpc_security_group_ingress_rule" and prop_name=="GroupId":
+        tf_arg_name="security_group_id"
 
-    result = matcher(search_term, search_items, 80)
+    else:
+        search_term = camel_case_split(prop_name)
 
-    if not result:
-        log.debug(f"No match found for {prop_name}, commenting out this argument.")
-        # return f"// CF Property({prop_name})", str(prop_value)
-        return prop_name, CommentType(f"CF Property({prop_name}) = {prop_value}")
+        log.debug(f"Searching for {search_term} instead of {prop_name}")
 
-    attribute_match, ranking = result
+        result = matcher(search_term, search_items, 80)
 
-    # Putting the underscore back in
-    tf_arg_name = attribute_match.replace(" ", "_")
+        if not result:
+            log.debug(f"No match found for {prop_name}, commenting out this argument.")
+            # return f"// CF Property({prop_name})", str(prop_value)
+            return prop_name, CommentType(f"CF Property({prop_name}) = {prop_value}")
 
-    log.debug(f"Converted {prop_name} to {tf_arg_name} with {ranking}% match.")
+        attribute_match, ranking = result
+
+        # Putting the underscore back in
+        tf_arg_name = attribute_match.replace(" ", "_")
+
+        log.debug(f"Converted {prop_name} to {tf_arg_name} with {ranking}% match.")
 
     # Terraform sometimes has nested blocks, if prop_value is a map/list, its possible
     # that tf_attribute_name is a nested block in terraform
@@ -589,13 +606,13 @@ def parse_subsection(
                 sub_args.append(CommentType(sub_props))
 
             try:
-                sub_args.append(props_to_args(sub_props, valid_sub_args, docs_path))
+                sub_args.append(props_to_args(None, sub_props, valid_sub_args, docs_path))
             except:  # noqa: E722
                 sub_args.append(CommentType(sub_props))
 
         return arg_name, ListType(sub_args)
 
-    sub_attrs = props_to_args(prop_value, valid_sub_args, docs_path)
+    sub_attrs = props_to_args(None, prop_value, valid_sub_args, docs_path)
     return arg_name, Block(arg_name, (), sub_attrs)
 
 

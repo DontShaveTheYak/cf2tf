@@ -47,7 +47,7 @@ def test_props_to_args(
 ):
     valid_arguments, _ = doc_file.parse_attributes(docs_path)
 
-    converted_args = convert.props_to_args(props, valid_arguments, docs_path)
+    converted_args = convert.props_to_args(None, props, valid_arguments, docs_path)
 
     assert converted_args.keys() == expected_args.keys()
 
