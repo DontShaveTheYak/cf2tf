@@ -21,6 +21,7 @@ MAPPINGS = {
     "AWS::ElasticLoadBalancing::LoadBalancer": "aws_lb",
     "AWS::AutoScaling::LaunchConfiguration": "aws_launch_configuration",
     "AWS::EC2::VPCGatewayAttachment": "aws_internet_gateway_attachment",
+    "AWS::RDS::EventSubscription": "aws_db_event_subscription"
 }
 
 

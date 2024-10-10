@@ -522,7 +522,8 @@ def convert_prop_to_arg(
 
     if tf_type=="aws_vpc_security_group_ingress_rule" and prop_name=="GroupId":
         tf_arg_name="security_group_id"
-
+    elif tf_type=="aws_vpc_security_group_egress_rule" and prop_name=="GroupId":
+        tf_arg_name="security_group_id"
     else:
         search_term = camel_case_split(prop_name)
 

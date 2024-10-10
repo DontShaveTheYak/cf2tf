@@ -37,6 +37,13 @@ def cli(output: Optional[str], stack: str):
 
 # Download the CloudFormation template from AWS
     client = boto3.client('cloudformation')
+
+    response = client.list_stacks()
+    stacks = response['StackSummaries']
+    stack_names = [stack['StackName'] for stack in stacks]
+    for stack_name in stack_names:
+        print(stack_name)
+
     response = client.get_template(
         StackName=stack
     )
@@ -78,7 +85,7 @@ def cli(output: Optional[str], stack: str):
 
     def generate_import_statement(resource_type, resource_name, cf_resource):
         identifier = None
-        if resource_type.replace('"','') in ['aws_iam_role','aws_vpc','aws_route_table','aws_subnet','aws_route_table_association']:
+        if resource_type.replace('"','') in ['aws_iam_role','aws_vpc','aws_route_table','aws_subnet','aws_route_table_association','aws_security_group','aws_vpc_security_group_egress_rule','aws_vpc_security_group_ingress_rule','aws_instance','aws_eip','aws_sns_topic','aws_sns_topic_subscription','aws_db_parameter_group','aws_db_instance','aws_db_subnet_group','aws_db_option_group']:
             identifier = cf_resource['PhysicalResourceId']
         if identifier:
             return f"terraform import {resource_type}.{resource_name} '{identifier}'"
@@ -102,6 +109,8 @@ def cli(output: Optional[str], stack: str):
         if import_statement is not None:
             # print the import statement
             print(import_statement)
+        else:
+            print(f"Resource type {resource_type} does not have a corresponding import statement")
 
     # Save this configuration to disc
     config.save(output_writer)
