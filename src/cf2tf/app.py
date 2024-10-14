@@ -85,7 +85,7 @@ def cli(output: Optional[str], stack: str):
 
     def generate_import_statement(resource_type, resource_name, cf_resource):
         identifier = None
-        if resource_type.replace('"','') in ['aws_iam_role','aws_vpc','aws_route_table','aws_subnet','aws_route_table_association','aws_security_group','aws_vpc_security_group_egress_rule','aws_vpc_security_group_ingress_rule','aws_instance','aws_eip','aws_sns_topic','aws_sns_topic_subscription','aws_db_parameter_group','aws_db_instance','aws_db_subnet_group','aws_db_option_group']:
+        if resource_type.replace('"','') in ['aws_iam_role','aws_vpc','aws_route_table','aws_subnet','aws_route_table_association','aws_security_group','aws_vpc_security_group_egress_rule','aws_vpc_security_group_ingress_rule','aws_instance','aws_eip','aws_sns_topic','aws_sns_topic_subscription','aws_db_parameter_group','aws_db_instance','aws_db_subnet_group','aws_db_option_group','aws_iam_instance_profile','aws_efs_file_system','aws_efs_mount_target','aws_launch_configuration','aws_autoscaling_group','aws_lb']:
             identifier = cf_resource['PhysicalResourceId']
         if identifier:
             return f"terraform import {resource_type}.{resource_name} '{identifier}'"
