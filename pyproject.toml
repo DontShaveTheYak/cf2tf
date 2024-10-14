@@ -21,6 +21,7 @@ thefuzz = {extras = ["speedup"], version = "^0.22.0"}
 click-log = "^0.4.0"
 requests = "^2.27.1"
 pytest = "^8.0.0"
+boto3 = "^1.35"
 
 [tool.poetry.dev-dependencies]
 black = "^24.0.0"

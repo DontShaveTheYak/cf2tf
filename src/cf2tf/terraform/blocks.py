@@ -65,9 +65,13 @@ class Resource(Block):
         arguments: Dict[str, Any],
         valid_arguments: List[str],
         valid_attributes: List[str],
+        cf_resource_id: str,
+        cf_resource_value: dict[str, Any]
     ) -> None:
         self.name = f'"{name}"'
         self.type = f'"{type}"'
+        self.cf_resource_id = cf_resource_id
+        self.cf_resource_value = cf_resource_value
         super().__init__(
             "resource",
             (self.type, self.name),

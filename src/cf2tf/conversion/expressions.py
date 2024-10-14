@@ -532,8 +532,6 @@ def get_azs(template: "TemplateConverter", region: Any):
             f"Fn::GetAZs - The region must be a String, not {type(region).__name__}."
         )
 
-    region = region
-
     data = [
         data for data in template.post_proccess_blocks if isinstance(data, hcl2.Data)
     ]
@@ -543,8 +541,8 @@ def get_azs(template: "TemplateConverter", region: Any):
             "available", "aws_availability_zones", {"state": StringType("available")}
         )
         template.post_proccess_blocks.insert(0, az_data)
-
-    return az_data.ref("names")
+        return az_data.ref("names")
+    return data[0].ref("names")
 
 
 # todo Handle functions that are not applicable to terraform.
