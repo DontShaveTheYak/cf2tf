@@ -6,7 +6,7 @@ import pytest
 
 import cf2tf.convert as convert
 from cf2tf.terraform import code, doc_file
-from cf2tf.terraform.blocks import Data, Locals, Output, Block
+from cf2tf.terraform.blocks import Block, Data, Locals, Output
 from cf2tf.terraform.hcl2.primitive import StringType
 
 
@@ -162,8 +162,16 @@ def test_perform_resource_overrides():
 def test_perform_global_overrides():
     template = tc()
 
-    params = {"Tags": [{"Key": "foo", "Value": "bar"}]}
+    empty_params = {"Tags": []}
+    result = convert.perform_global_overrides("aws_s3_bucket", empty_params, template)
 
+    assert result is empty_params
+    assert "Tags" not in result
+    assert "tags" in result
+    assert isinstance(result["tags"], list)
+    assert [] == result["tags"]
+
+    params = {"Tags": [{"Key": "foo", "Value": "bar"}]}
     result = convert.perform_global_overrides("aws_s3_bucket", params, template)
 
     assert result is params
