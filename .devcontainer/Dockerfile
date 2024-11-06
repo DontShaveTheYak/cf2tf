@@ -58,3 +58,4 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 
 # Install nox and pre-commit to automate CI stuff
 RUN pip install --user --upgrade nox nox_poetry pre-commit
+RUN git config --global --add safe.directory /workspaces/cf2tf
