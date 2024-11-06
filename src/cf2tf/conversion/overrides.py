@@ -51,6 +51,11 @@ def tag_conversion(_tc: "TemplateConverter", params: CFParams) -> CFParams:
         return params
 
     original_tags: ListType = params["Tags"]  # type: ignore
+    # Handle Cloudformation templates that generate Tags: []
+    if not original_tags:
+        params["tags"] = params["Tags"]
+        del params["Tags"]
+        return params
 
     first_item = original_tags[0]
 
