@@ -167,9 +167,8 @@ def test_perform_global_overrides():
 
     assert result is empty_params
     assert "Tags" not in result
-    assert "tags" in result
-    assert isinstance(result["tags"], list)
-    assert [] == result["tags"]
+    assert "tags" not in result
+    assert {} == result
 
     params = {"Tags": [{"Key": "foo", "Value": "bar"}]}
     result = convert.perform_global_overrides("aws_s3_bucket", params, template)
