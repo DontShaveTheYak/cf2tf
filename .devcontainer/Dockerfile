@@ -1,17 +1,9 @@
 FROM ubuntu:24.04
 
 ARG USERNAME=ubuntu
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
 
 # Ensure apt is in non-interactive to avoid prompts
 ENV DEBIAN_FRONTEND=noninteractive
-
-# Create the user
-RUN apt-get update \
-    && apt-get install -y sudo \
-    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
@@ -39,18 +31,18 @@ SHELL ["/bin/bash","--login", "-c"]
 
 # Stuff needed to make pyenv work correctly since the login shell
 # above doesnt seem to run bachrc
-ENV PYENV_ROOT="/home/ubuntu/.pyenv"
+ENV PYENV_ROOT="/home/${USERNAME}/.pyenv"
 ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
 
 # Install the required python versions (this takes a bit usually) so we do lots of cacheing
-RUN --mount=type=cache,target=/home/ubuntu/.pyenv/cache,uid=1000 \
-    pyenv install -s 3.8.18 && \
-    pyenv install -s 3.9.18 && \
-    pyenv install -s 3.10.13 && \
-    pyenv install -s 3.11.6 && \
-    pyenv install -s 3.12.0 && \
-    pyenv global 3.11.6 && \
+RUN --mount=type=cache,target=/home/${USERNAME}/.pyenv/cache,uid=1000 \
+    pyenv install -s 3.9.20 && \
+    pyenv install -s 3.10.15 && \
+    pyenv install -s 3.11.10 && \
+    pyenv install -s 3.12.7 && \
+    pyenv install -s 3.13.0 && \
+    pyenv global 3.12.7 3.13.0 3.11.10 3.10.15 3.9.20 && \
     pyenv rehash
 
 # Install poetry to manage our python project
