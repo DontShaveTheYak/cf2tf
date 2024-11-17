@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 cf2tf = "cf2tf.app:cli"
 
 [tool.poetry.dependencies]
-python = "^3.8.1"
+python = ">=3.9,<3.14"
 cfn-flip = "^1.3.0"
 PyYAML = "^6.0"
 click = "^8.1.2"
