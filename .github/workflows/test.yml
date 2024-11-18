@@ -10,15 +10,15 @@ on:
 jobs:
   single:
     runs-on: ubuntu-latest
-    name: Python 3.11
+    name: Python 3.12
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4.1.4
+        uses: actions/checkout@v4.2.2
 
       - name: Setup Latest Python
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: 3.11
+          python-version: 3.12
           architecture: x64
 
       - name: Setup Poetry
@@ -30,34 +30,32 @@ jobs:
         run: pip install nox nox_poetry coverage[toml]
 
       - name: Run Tests
-        run: nox -s tests -p 3.11
+        run: nox -s tests -p 3.12
 
       - name: Combine Coverage reports
-        run: nox -s coverage -p 3.11
+        run: nox -s coverage -p 3.12
 
       - name: Convert Coverage
         run: coverage xml --fail-under=0
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4.3.1
+        uses: codecov/codecov-action@v5.0.2
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
-          fail_ci_if_error: false
 
   multi:
     needs: single
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.12"] # 3.11 is done in the job above
+        python-version: ["3.9", "3.10", "3.11","3.13"] # 3.12 is done in the job above
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4.1.4
+        uses: actions/checkout@v4.2.2
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64

@@ -20,14 +20,14 @@ jobs:
     steps:
 
       - name: Checkout Code
-        uses: actions/checkout@v4.1.4
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5.1.0
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           architecture: x64
 
       - name: Install dependencies
@@ -75,12 +75,12 @@ jobs:
     needs: tag
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4.1.4
+        uses: actions/checkout@v4.2.2
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5.1.0
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           architecture: x64
 
       - name: Setup Poetry
