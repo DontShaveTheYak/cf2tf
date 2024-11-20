@@ -39,7 +39,7 @@ jobs:
         run: coverage xml --fail-under=0
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5.0.4
+        uses: codecov/codecov-action@v5.0.5
         with:
           flags: unit
 
