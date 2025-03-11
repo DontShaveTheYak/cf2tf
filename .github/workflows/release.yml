@@ -27,7 +27,7 @@ jobs:
       - name: Setup Python 3.12
         uses: actions/setup-python@v5.4.0
         with:
-          python-version: '3.12'
+          python-version: '3.13'
           architecture: x64
 
       - name: Install dependencies
@@ -80,7 +80,7 @@ jobs:
       - name: Setup Python 3.12
         uses: actions/setup-python@v5.4.0
         with:
-          python-version: '3.12'
+          python-version: '3.13'
           architecture: x64
 
       - name: Setup Poetry
