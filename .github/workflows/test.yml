@@ -23,7 +23,7 @@ jobs:
 
       - name: Setup Poetry
         run: |
-          pip install poetry==1.4.0
+          pip install poetry==2.2.1
           poetry install
 
       - name: Setup requirements
@@ -64,7 +64,9 @@ jobs:
         run: pip install nox nox_poetry
 
       - name: Setup Poetry
-        run: pip install poetry==1.4.0
+        run: |
+          pip install poetry==2.2.1
+          poetry install
 
       - name: Run Tests
         run: nox -s tests -p ${{ matrix.python-version }}
