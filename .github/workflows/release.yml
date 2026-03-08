@@ -20,19 +20,21 @@ jobs:
     steps:
 
       - name: Checkout Code
-        uses: actions/checkout@v4.3.1
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5.4.0
         with:
-          python-version: '3.13'
+          python-version: '3.12'
+          architecture: x64
 
       - name: Install dependencies
         run: |
-          uv pip install --system -r .scripts/requirements.txt
-          uv tool install poetry
+          python -m pip install --upgrade pip
+          pip install -r .scripts/requirements.txt
+          pip install poetry==2.2.1
 
       - name: Get Latest Tag
         id: latest_tag
@@ -73,15 +75,16 @@ jobs:
     needs: tag
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4.3.1
+        uses: actions/checkout@v4.2.2
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5.4.0
         with:
-          python-version: '3.13'
+          python-version: '3.12'
+          architecture: x64
 
       - name: Setup Poetry
-        run: uv tool install poetry
+        run: pip install poetry==2.2.1
 
       - name: Publish to PyPI
         run: |
