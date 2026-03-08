@@ -35,19 +35,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4.3.1
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: ${{ needs.get-versions.outputs.default }}
+          architecture: x64
 
       - name: Setup Poetry
-        run: uv tool install poetry
-
-      - name: Install dependencies
-        run: poetry install
+        run: |
+          pip install poetry
+          poetry install
 
       - name: Run Pre-commit
-        run: uvx pre-commit run --all-files
+        uses: pre-commit/action@v3.0.1
         env:
           SKIP: pytest
 
@@ -62,18 +62,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4.3.1
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
+          architecture: x64
 
+      # Install Poetry Nox and nox-poetry
       - name: Setup Environment
         run: |
-          uv tool install poetry
-          uv tool install nox --with nox-poetry
-
-      # - name: Install dependencies
-      #   run: poetry install
+          pip install poetry poetry-plugin-export nox nox-poetry
 
       - name: Run Tests
         run: nox -p ${{ matrix.python-version }}
