@@ -8,6 +8,7 @@ on:
     paths-ignore:
       - '.github/workflows/release.yml'
       - '.github/workflows/pr_checks.yml'
+  merge_group:
 
 jobs:
   get-versions:
