@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "Levi Blaney", email = "shadycuz@gmail.com" }]
 keywords = [ "cloudformation", "terraform", "cf2tf", "convert", "cloud", "conversion"]
 license = "GPL-3.0-only"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "cfn-flip>=1.3.0,<2.0.0",
     "PyYAML>=6.0,<7.0",
