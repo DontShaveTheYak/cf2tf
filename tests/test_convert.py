@@ -86,8 +86,6 @@ def test_convert_resource(tc: convert.TemplateConverter, cf_resource, expectatio
 
 
 def test_add_post_block():
-    global tc
-
     template = tc()
 
     block_a = Locals({})
@@ -112,8 +110,6 @@ def test_add_post_block():
 
 
 def test_get_block_by_type():
-    global tc
-
     template = tc()
 
     block_a = Locals({})
