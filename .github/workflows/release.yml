@@ -24,17 +24,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5.6.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.13'
-          architecture: x64
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r .scripts/requirements.txt
-          pip install poetry==2.2.1
+          uv pip install --system -r .scripts/requirements.txt
+          uv tool install poetry
 
       - name: Get Latest Tag
         id: latest_tag
@@ -77,14 +75,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4.3.1
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5.6.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.13'
-          architecture: x64
 
       - name: Setup Poetry
-        run: pip install poetry==2.2.1
+        run: uv tool install poetry
 
       - name: Publish to PyPI
         run: |
