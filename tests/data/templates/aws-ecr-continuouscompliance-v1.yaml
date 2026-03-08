@@ -2,31 +2,31 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Automated Image Scan Compliance for AWS EKS using AWS ECR and AWS Security Hub
 
 # ----------------------------------------------------------------------------------------------------------
-#  CloudFormation Template 1 of 1 - 
-#   
-#  
+#  CloudFormation Template 1 of 1 -
+#
+#
 #  1- Provisions CloudWatchEvents (EventBridge) Rule:
 #    - CloudWatchEvents Rule is triggered based on a AWS ECR Event for a completed Image Scan
 #  2- Provisions a Compliance Lambda as a target for the CloudWatch Events Rule.
-#  3- Compliance Lambda: 
+#  3- Compliance Lambda:
 #   - Obtains event details from the ECR Complated Image scan event
 #   - Creates a finding in AWS Security Hub
 #  4 - Provisions an AWS Security Hub Custom Action
 #    - Performs remediation by attaching restricted policy to ECR repository
-# 
-# 
+#
+#
 # @kmmahaj
 ##
 ## License:
 ## This code is made available under the MIT-0 license. See the LICENSE file.
 # ------------------------------------------------------------...............................................
 
- 
+
 Resources:
 
 # --------------------------------------------------------------------------------------------------
 #  1- Provisions a CloudWatchEvents Rule that is triggered based on ECR Image Scan Event
-#  2- Provisions a Lambda that creates a finding in AWS Security Hub 
+#  2- Provisions a Lambda that creates a finding in AWS Security Hub
 # --------------------------------------------------------------------------------------------------
 
   CaptureECRImageScanEvents:
@@ -82,7 +82,7 @@ Resources:
                   numMedium = findingsevcounts['MEDIUM']
               if findingsevcounts.get('HIGH'):
                   numHigh = findingsevcounts['HIGH']
-                          
+
               # send finding to Security Hub
               severity = "LOW"
               title = "ECR Finding"
@@ -148,7 +148,7 @@ Resources:
                   print(e)
                   print("Submitting finding to Security Hub failed, please troubleshoot further")
                   raise
-  
+
   ECRToSecHubSendFindingsLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -229,7 +229,7 @@ Resources:
               except Exception as e:
                   print(e)
                   cfnresponse.send(event, context, cfnresponse.FAILED, {})
-  
+
   CreateSecurityHubCustomActionTargetLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -262,30 +262,30 @@ Resources:
           - sts:AssumeRole
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------
-# Create Remediation to deny ECR repository access 
+# Create Remediation to deny ECR repository access
 # -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-  ECRAccessProhibitedRule: 
+  ECRAccessProhibitedRule:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       Name: ECRAccessProhibitedRule
       Description: "ECR1 - Deny Access to ECR due to vulnerability assesment"
-      EventPattern: 
-        source: 
+      EventPattern:
+        source:
           - aws.securityhub
-        detail-type: 
+        detail-type:
           - Security Hub Findings - Custom Action
-        resources: 
+        resources:
           - !GetAtt ECRActionTarget.Arn
       State: "ENABLED"
-      Targets: 
-        - 
-          Arn: 
-            Fn::GetAtt: 
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
               - "ECRAccessProhibitedLambda"
               - "Arn"
           Id: "ECR1"
-  
+
   ECRActionTarget:
     Type: Custom::ActionTarget
     Version: 1.0
@@ -295,15 +295,15 @@ Resources:
       Description: Deny Access to ECR
       Id: ECR11
 
-  ECRAccessProhibitedLambdaPermission: 
+  ECRAccessProhibitedLambdaPermission:
     Type: AWS::Lambda::Permission
-    Properties: 
-      FunctionName: 
+    Properties:
+      FunctionName:
         Ref: "ECRAccessProhibitedLambda"
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
-      SourceArn: 
-        Fn::GetAtt: 
+      SourceArn:
+        Fn::GetAtt:
           - "ECRAccessProhibitedRule"
           - "Arn"
 
@@ -323,7 +323,7 @@ Resources:
           import json
           import os
           def lambda_handler(event, context):
-    
+
               repoName = str(event['detail']['findings'][0]['ProductFields']['ECRRepoName'])
               ecr = boto3.client('ecr')
               try:
@@ -332,7 +332,7 @@ Resources:
                       repositoryName=repoName,
                       policyText=policyText
                   )
-        
+
               except Exception as e:
                   print(e)
                   print("SSM automation execution error")

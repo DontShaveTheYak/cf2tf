@@ -1,5 +1,4 @@
-"""Save the results of the conversion.
-"""
+"""Save the results of the conversion."""
 
 import logging
 from itertools import groupby

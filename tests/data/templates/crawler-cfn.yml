@@ -279,5 +279,3 @@ Resources:
           SerdeInfo:
             SerializationLibrary: 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
           Location: 's3://report-bucket/cur/report-name/cost_and_usage_data_status/'
-
-
