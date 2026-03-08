@@ -20,12 +20,12 @@ jobs:
     steps:
 
       - name: Checkout Code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5.4.0
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.12'
           architecture: x64
@@ -34,11 +34,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r .scripts/requirements.txt
-          pip install poetry==1.4.0
+          pip install poetry==2.2.1
 
       - name: Get Latest Tag
         id: latest_tag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        uses: "WyriHaximus/github-action-get-previous-tag@v2"
 
       - name: Calculate base tag
         id: calculate
@@ -75,16 +75,16 @@ jobs:
     needs: tag
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
 
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5.4.0
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: '3.12'
           architecture: x64
 
       - name: Setup Poetry
-        run: pip install poetry==1.4.0
+        run: pip install poetry==2.2.1
 
       - name: Publish to PyPI
         run: |
@@ -98,7 +98,7 @@ jobs:
     needs: [tag, publish]
     steps:
       - name: Create Draft Release
-        uses: release-drafter/release-drafter@v6.1.0
+        uses: release-drafter/release-drafter@v6.4.0
         if: github.base_ref == 'develop'
         with:
           tag: ${{needs.tag.outputs.tag}}
@@ -108,7 +108,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
-        uses: release-drafter/release-drafter@v6.1.0
+        uses: release-drafter/release-drafter@v6.4.0
         if: github.base_ref == 'master'
         with:
           tag: ${{needs.tag.outputs.tag}}

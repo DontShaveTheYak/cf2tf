@@ -1,37 +1,47 @@
-[tool.poetry]
+[project]
 name = "cf2tf"
 version = "0.0.0"
 description = "Convert Cloudformation Templates to Terraform."
 readme = "README.md"
-authors = ["Levi Blaney <shadycuz@gmail.com>"]
-repository = "https://github.com/DontShaveTheYak/cf2tf"
-keywords = ["cloudformation", "terraform", "cf2tf", "convert", "cloud", "conversion"]
+authors = [{ name = "Levi Blaney", email = "shadycuz@gmail.com" }]
+keywords = [ "cloudformation", "terraform", "cf2tf", "convert", "cloud", "conversion"]
 license = "GPL-3.0-only"
+requires-python = ">=3.10"
+dependencies = [
+    "cfn-flip>=1.3.0,<2.0.0",
+    "PyYAML>=6.0,<7.0",
+    "click>=8.1.2,<9.0.0",
+    "GitPython>=3.1.27,<4.0.0",
+    "thefuzz[speedup]>=0.22.0,<0.23.0",
+    "click-log>=0.4.0,<0.5.0",
+    "requests>=2.27.1,<3.0.0",
+]
 
-[tool.poetry.scripts]
+[project.urls]
+repository = "https://github.com/DontShaveTheYak/cf2tf"
+
+[project.scripts]
 cf2tf = "cf2tf.app:cli"
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.14"
-cfn-flip = "^1.3.0"
-PyYAML = "^6.0"
-click = "^8.1.2"
-GitPython = "^3.1.27"
-thefuzz = {extras = ["speedup"], version = "^0.22.0"}
-click-log = "^0.4.0"
-requests = "^2.27.1"
-pytest = "^8.0.0"
+[dependency-groups]
+dev = [
+    "black>=25",
+    "flake8>=7",
+    "flake8-black>=0.3.3",
+    "coverage[toml]>=7",
+    "pytest>=8.0.0",
+    "pytest-cov>=6",
+    "mypy>=1.1",
+]
 
-[tool.poetry.dev-dependencies]
-black = "^25.0.0"
-flake8 = "^7.0.0"
-flake8-black = "^0.3.3"
-coverage = {extras = ["toml"], version = "^7.0.0"}
-pytest-cov = "^6.0.0"
-mypy = "^1.1"
+[tool.poetry]
+requires-poetry = ">=2.0"
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.isort]

@@ -2493,4 +2493,3 @@ Outputs:
           - Fn::GetAtt:
               - ConversionsApiGatewayBastionIamRole
               - RoleId
-
