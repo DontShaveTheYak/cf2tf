@@ -38,7 +38,7 @@ jobs:
 
       - name: Get Latest Tag
         id: latest_tag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        uses: "WyriHaximus/github-action-get-previous-tag@v2"
 
       - name: Calculate base tag
         id: calculate
