@@ -19,12 +19,13 @@ jobs:
       - name: Read Python versions from .python-versions
         id: get
         run: |
-          python3 -c "
-          import json
-          versions = [l.strip() for l in open('.python-versions') if l.strip()]
-          print('versions=' + json.dumps(versions))
-          print('default=' + versions[0])
-          " >> $GITHUB_OUTPUT
+          VERSIONS=$(grep -v '^\s*$' .python-versions | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          DEFAULT=$(grep -v '^\s*$' .python-versions | head -1)
+          echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
+          echo "default=$DEFAULT" >> $GITHUB_OUTPUT
+        outputs:
+          versions: ${{ steps.get.outputs.versions }}
+          default: ${{ steps.get.outputs.default }}
 
   pre_commit:
     needs: get-versions
