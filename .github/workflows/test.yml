@@ -12,6 +12,9 @@ on:
 jobs:
   get-versions:
     runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.get.outputs.versions }}
+      default: ${{ steps.get.outputs.default }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4.3.1
@@ -23,9 +26,6 @@ jobs:
           DEFAULT=$(grep -v '^\s*$' .python-versions | head -1)
           echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
           echo "default=$DEFAULT" >> $GITHUB_OUTPUT
-        outputs:
-          versions: ${{ steps.get.outputs.versions }}
-          default: ${{ steps.get.outputs.default }}
 
   pre_commit:
     needs: get-versions
