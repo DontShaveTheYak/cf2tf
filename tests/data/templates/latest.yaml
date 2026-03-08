@@ -46,7 +46,7 @@ Parameters:
     ConstraintDescription: ReservedConcurrency must be an integer number
     Default: ""
     Description: >-
-      Reserved concurrency for the Datadog Forwarder Lambda function. If empty, use unreserved account concurrency. 
+      Reserved concurrency for the Datadog Forwarder Lambda function. If empty, use unreserved account concurrency.
       We recommend using at least 10 reserved concurrency, but default to 0 as you may need to increase your limits for this.
       If using unreserved account concurrency you may limit other lambda functions in your environment.
   LogRetentionInDays:
