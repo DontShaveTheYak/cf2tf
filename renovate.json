@@ -3,6 +3,7 @@
   "extends": [
     "github>DontShaveTheYak/renovate-config"
   ],
+  "baseBranchPatterns": ["develop"],
   "packageRules": [
     {
       "matchUpdateTypes": [
