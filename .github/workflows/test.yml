@@ -3,37 +3,112 @@ name: Tests
 on:
   push:
     branches:
-      - "master"
+      - 'master'
   pull_request:
-    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - '.github/workflows/release.yml'
+      - '.github/workflows/pr_checks.yml'
 
 jobs:
-  single:
+  get-versions:
     runs-on: ubuntu-latest
-    name: Python 3.12
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4.3.1
 
-      - name: Setup Latest Python
-        uses: actions/setup-python@v5.6.0
+      - name: Read Python versions from .python-versions
+        id: get
+        run: |
+          python3 -c "
+          import json
+          versions = [l.strip() for l in open('.python-versions') if l.strip()]
+          print('versions=' + json.dumps(versions))
+          print('default=' + versions[0])
+          " >> $GITHUB_OUTPUT
+
+  pre_commit:
+    needs: get-versions
+    runs-on: ubuntu-latest
+    name: Pre-commit
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4.3.1
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: 3.12
-          architecture: x64
+          python-version: ${{ needs.get-versions.outputs.default }}
 
       - name: Setup Poetry
-        run: |
-          pip install poetry==2.2.1
-          poetry install
+        run: uv tool install poetry
 
-      - name: Setup requirements
-        run: pip install nox nox_poetry coverage[toml]
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Run Pre-commit
+        uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: pytest
+
+  multi:
+    needs: [pre_commit, get-versions]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(needs.get-versions.outputs.versions) }}
+    name: Python ${{ matrix.python-version }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4.3.1
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Environment
+        run: |
+          uv tool install poetry
+          uv tool install nox --with nox-poetry
+
+      # - name: Install dependencies
+      #   run: poetry install
 
       - name: Run Tests
-        run: nox -s tests -p 3.12
+        run: nox -p ${{ matrix.python-version }}
 
-      - name: Combine Coverage reports
-        run: nox -s coverage -p 3.12
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: .coverage.*
+          if-no-files-found: error
+          include-hidden-files: true
+
+  coverage:
+    needs: [multi, get-versions]
+    runs-on: ubuntu-latest
+    name: Coverage
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4.3.1
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ needs.get-versions.outputs.default }}
+
+      - name: Install Coverage
+        run: uv tool install "coverage[toml]"
+
+      - name: Download Coverage Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Combine Coverage
+        run: coverage combine
 
       - name: Convert Coverage
         run: coverage xml --fail-under=0
@@ -42,31 +117,5 @@ jobs:
         uses: codecov/codecov-action@v5.5.2
         with:
           flags: unit
-
-  multi:
-    needs: single
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.13", "3.14"] # 3.12 is done in the job above
-    name: Python ${{ matrix.python-version }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4.3.1
-
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5.6.0
-        with:
-          python-version: ${{ matrix.python-version }}
-          architecture: x64
-
-      - name: Setup Nox
-        run: pip install nox nox_poetry
-
-      - name: Setup Poetry
-        run: |
-          pip install poetry==2.2.1
-          poetry install
-
-      - name: Run Tests
-        run: nox -s tests -p ${{ matrix.python-version }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
