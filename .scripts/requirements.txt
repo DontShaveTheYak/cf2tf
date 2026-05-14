@@ -1,2 +1,2 @@
-requests==2.34.1
+requests==2.34.2
 semver==3.0.4
