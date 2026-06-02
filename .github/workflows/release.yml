@@ -20,7 +20,7 @@ jobs:
     steps:
 
       - name: Checkout Code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
@@ -75,7 +75,7 @@ jobs:
     needs: tag
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - name: Setup Python 3.12
         uses: actions/setup-python@v6.2.0
