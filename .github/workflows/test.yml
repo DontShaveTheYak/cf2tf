@@ -94,7 +94,7 @@ jobs:
         uses: actions/checkout@v6.0.3
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.3.2
         with:
           python-version: ${{ needs.get-versions.outputs.default }}
 
