@@ -18,7 +18,7 @@ jobs:
       default: ${{ steps.get.outputs.default }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6.1.0
+        uses: actions/checkout@v7.0.1
 
       - name: Read Python versions from .python-versions
         id: get
@@ -34,7 +34,7 @@ jobs:
     name: Pre-commit
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6.1.0
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Python
         uses: actions/setup-python@v6.3.0
@@ -61,7 +61,7 @@ jobs:
     name: Python ${{ matrix.python-version }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6.1.0
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6.3.0
@@ -91,7 +91,7 @@ jobs:
     name: Coverage
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6.1.0
+        uses: actions/checkout@v7.0.1
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
