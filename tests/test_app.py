@@ -8,3 +8,10 @@ def test_cli():
     print(result.output)
     assert result.exit_code == 0
     assert "0.0.0" in result.output
+
+
+def test_cli_aws_provider_version_option():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "--aws-provider-version" in result.output

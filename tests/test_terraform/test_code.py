@@ -1,9 +1,12 @@
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from cf2tf.terraform.code import (
     SearchManager,
+    get_code,
+    provider_repo_path,
     resource_type_to_name,
     search_manager,
     transform_file_name,
@@ -63,3 +66,45 @@ def test_resource_type_to_name(input, expected):
     result = resource_type_to_name(input)
 
     assert result == expected
+
+
+def test_provider_repo_path_default():
+    assert provider_repo_path().name == "terraform_src"
+    assert provider_repo_path(None).name == "terraform_src"
+
+
+def test_provider_repo_path_with_version():
+    assert provider_repo_path("v5.31.0").name == "terraform_src_v5.31.0"
+
+
+@patch("cf2tf.terraform.code.repo_from_existing")
+@patch("cf2tf.terraform.code.Repo.clone_from")
+def test_get_code_without_version(mock_clone_from, mock_repo_from_existing):
+    mock_repo_from_existing.return_value = None
+    mock_repo = MagicMock()
+    mock_clone_from.return_value = mock_repo
+
+    result = get_code()
+
+    assert result is mock_repo
+    mock_clone_from.assert_called_once()
+    _, kwargs = mock_clone_from.call_args
+    assert kwargs["url"].endswith("terraform-provider-aws.git")
+    assert kwargs["depth"] == 1
+    assert "branch" not in kwargs
+
+
+@patch("cf2tf.terraform.code.repo_from_existing")
+@patch("cf2tf.terraform.code.Repo.clone_from")
+def test_get_code_with_version(mock_clone_from, mock_repo_from_existing):
+    mock_repo_from_existing.return_value = None
+    mock_repo = MagicMock()
+    mock_clone_from.return_value = mock_repo
+
+    result = get_code("v5.0.0")
+
+    assert result is mock_repo
+    mock_clone_from.assert_called_once()
+    _, kwargs = mock_clone_from.call_args
+    assert kwargs["branch"] == "v5.0.0"
+    assert kwargs["to_path"].name == "terraform_src_v5.0.0"
