@@ -45,10 +45,10 @@ class SearchManager:
         return doc_path
 
 
-def search_manager():
+def search_manager(aws_provider_version: Optional[str] = None):
     docs_dir = "website/docs"
 
-    repo = get_code()
+    repo = get_code(aws_provider_version)
 
     docs_path = Path(repo.working_dir).joinpath(docs_dir)
 
@@ -58,9 +58,19 @@ def search_manager():
     return SearchManager(docs_path)
 
 
-def get_code() -> Repo:
+AWS_PROVIDER_REPO = "https://github.com/hashicorp/terraform-provider-aws.git"
+
+
+def provider_repo_path(aws_provider_version: Optional[str] = None) -> Path:
     temp_dir = Path(gettempdir())
-    repo_path = temp_dir.joinpath("terraform_src")
+    if aws_provider_version:
+        safe_version = aws_provider_version.replace("/", "_").replace("\\", "_")
+        return temp_dir.joinpath(f"terraform_src_{safe_version}")
+    return temp_dir.joinpath("terraform_src")
+
+
+def get_code(aws_provider_version: Optional[str] = None) -> Repo:
+    repo_path = provider_repo_path(aws_provider_version)
 
     try:
         existing_repo = repo_from_existing(repo_path)
@@ -74,14 +84,18 @@ def get_code() -> Repo:
 
     print(f"// Cloning Terraform src code to {repo_path}...", end="")
 
-    repo_path.mkdir(exist_ok=True)
+    repo_path.mkdir(exist_ok=True, parents=True)
 
-    repo = Repo.clone_from(
-        "https://github.com/hashicorp/terraform-provider-aws.git",
-        repo_path,
-        depth=1,
-        progress=CloneProgress(),  # type: ignore
-    )
+    clone_kwargs = {
+        "url": AWS_PROVIDER_REPO,
+        "to_path": repo_path,
+        "depth": 1,
+        "progress": CloneProgress(),  # type: ignore
+    }
+    if aws_provider_version:
+        clone_kwargs["branch"] = aws_provider_version
+
+    repo = Repo.clone_from(**clone_kwargs)
     click.echo(" code has been checked out.")
 
     return repo

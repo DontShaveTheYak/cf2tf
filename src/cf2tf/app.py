@@ -17,9 +17,18 @@ click_log.basic_config(log)
 @click.command()  # type: ignore
 @click.version_option()
 @click.option("--output", "-o", type=click.Path(exists=False))
+@click.option(
+    "--aws-provider-version",
+    help=(
+        "Git ref (tag or branch) of hashicorp/terraform-provider-aws to use "
+        "when resolving Terraform resource documentation."
+    ),
+)
 @click_log.simple_verbosity_option(log)
 @click.argument("template_path", type=click.Path(exists=True))
-def cli(output: Optional[str], template_path: str):
+def cli(
+    output: Optional[str], aws_provider_version: Optional[str], template_path: str
+):
     """Convert Cloudformation template into Terraform.
 
     Args:
@@ -38,7 +47,7 @@ def cli(output: Optional[str], template_path: str):
     cf_template = Template.from_yaml(tmpl_path).template
 
     # Need to get the code from the repo
-    search_manger = code.search_manager()
+    search_manger = code.search_manager(aws_provider_version)
 
     # Turn Cloudformation template into a Terraform configuration
     config = TemplateConverter(tmpl_path.stem, cf_template, search_manger).convert()
