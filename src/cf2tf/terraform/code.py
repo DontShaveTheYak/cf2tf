@@ -64,13 +64,25 @@ def get_code() -> Repo:
 
     try:
         existing_repo = repo_from_existing(repo_path)
-
-        if existing_repo:
-            return existing_repo
-
     except InvalidGitRepositoryError:
-        rmtree(repo_path)
-        repo_path.rmdir()
+        log.warning(
+            "Found an invalid Terraform source repository at %s, removing it.",
+            repo_path,
+        )
+        _remove_path(repo_path)
+        existing_repo = None
+
+    if existing_repo is not None:
+        return existing_repo
+
+    # An interrupted clone may leave files behind without a valid .git dir,
+    # which would make `git clone` fail because the destination path exists.
+    if repo_path.exists():
+        log.warning(
+            "Found an incomplete Terraform source directory at %s, removing it.",
+            repo_path,
+        )
+        _remove_path(repo_path)
 
     print(f"// Cloning Terraform src code to {repo_path}...", end="")
 
@@ -85,6 +97,14 @@ def get_code() -> Repo:
     click.echo(" code has been checked out.")
 
     return repo
+
+
+def _remove_path(path: Path) -> None:
+    try:
+        rmtree(path)
+    except OSError:
+        log.exception("Failed to remove %s.", path)
+        raise
 
 
 def repo_from_existing(repo_path: Path) -> Optional[Repo]:
